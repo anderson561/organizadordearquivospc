@@ -8,8 +8,8 @@ Uma solução em Python desenvolvida sob princípios SOLID para a organização 
 *   **Identificação Inteligente de Impostos (`ImpostoStrategy`):** Lê o conteúdo de arquivos PDF buscando palavras-chave como `DARF`, `DAS`, `IPTU`, `IPVA` e `GRERJ`, organizando-os em pastas apropriadas.
 *   **Extração de Metadados de Notas Fiscais (`CompanyNameStrategy`):** Identifica e extrai automaticamente o Ano, o Mês e a Razão Social da empresa emitente no conteúdo do PDF para criar pastas estruturadas sob o formato `[Ano] / [Mês] / [Nome da Empresa]`.
 *   **Resolução de Conflitos e Duplicados:**
-    *   Evita sobrescrever arquivos usando sufixo de timestamp baseado na data de modificação (`mtime`).
-    *   Caso haja um arquivo com o mesmo nome de uma pasta de destino a ser criada, o arquivo conflitante é automaticamente renomeado com a tag `_CONFLITO_F_P` para permitir a criação do diretório.
+    *   Evita sobrescrever arquivos usando sufixo de timestamp baseado na data de modificação (`mtime`), com contador incremental caso esse nome também já esteja ocupado. O destino é reconferido antes do move: se ainda estiver em uso, a movimentação é abortada em vez de sobrescrever.
+    *   Caso haja um arquivo com o mesmo nome de uma pasta de destino a ser criada, o arquivo conflitante é automaticamente renomeado com a tag `_CONFLITO_F_P` (mais um contador, se necessário) para permitir a criação do diretório.
 *   **Interface Interativa:** Permite que o usuário insira o caminho da pasta a ser organizada diretamente no console ou por meio de argumentos CLI.
 
 ---
@@ -83,7 +83,13 @@ dist\OrganizadorArquivos.exe --path "C:\Users\ANDERSON\Desktop" --real
 
 ## 🧪 Como Executar os Testes Unitários
 
-Certifique-se de ter o `pytest` instalado no seu ambiente e rode na raiz do diretório `advanced-organizer`:
+As dependências ficam declaradas na raiz do repositório. A partir de `moverarquivos/`:
+
 ```bash
-python -m pytest
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.venv\Scripts\python.exe -m pytest advanced-organizer/tests
 ```
+
+São 13 testes (93% de cobertura). Os de `test_regressions.py` tocam o filesystem
+real de propósito — cobrem dois bugs de perda de arquivos que mocks não reproduzem.

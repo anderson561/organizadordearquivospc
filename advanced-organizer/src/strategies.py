@@ -2,7 +2,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional
 from pdfminer.high_level import extract_text
 
 def sanitize_path_component(name: str) -> str:
@@ -76,7 +76,7 @@ class CompanyNameStrategy(BaseStrategy):
 
             # Lógica para Razão Social
             company = "Desconhecido"
-            lines = [l.strip() for l in text.split('\n') if l.strip()]
+            lines = [ln.strip() for ln in text.split('\n') if ln.strip()]
             for i, line in enumerate(lines):
                 upper_line = line.upper()
                 if "RAZÃO SOCIAL" in upper_line or "EMITENTE" in upper_line or "NOME/RAZÃO SOCIAL" in upper_line:

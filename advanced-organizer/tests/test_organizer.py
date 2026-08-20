@@ -1,6 +1,6 @@
 import os
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import sys
 
 # Adiciona o diretório src ao path

@@ -19,45 +19,85 @@ class FileOrganizer:
             self.base_path: TypeStrategy(),
         }
 
+    @staticmethod
+    def _free_name(candidate: str, suffix_builder) -> str:
+        """Retorna o primeiro nome livre a partir de 'candidate'.
+
+        'suffix_builder(n)' recebe o numero da tentativa (1, 2, 3...) e devolve
+        o nome alternativo. Necessario porque o destino "desambiguado" tambem
+        pode ja existir - checar apenas uma vez causava sobrescrita silenciosa.
+        """
+        if not os.path.exists(candidate):
+            return candidate
+
+        attempt = 1
+        while True:
+            alternative = suffix_builder(attempt)
+            if not os.path.exists(alternative):
+                return alternative
+            attempt += 1
+
+    def _resolve_conflicts(self, dest_dir: str):
+        """Renomeia arquivos que ocupam o lugar de pastas no caminho de destino."""
+        # No Windows, removemos o drive para iterar nas pastas
+        drive, path_parts = os.path.splitdrive(dest_dir)
+        path_acc = drive + os.sep
+
+        for part in path_parts.strip(os.sep).split(os.sep):
+            path_acc = os.path.join(path_acc, part)
+            if os.path.exists(path_acc) and os.path.isfile(path_acc):
+                # Conflito fatal: existe um arquivo onde deveria ser uma pasta.
+                # O nome de quarentena precisa ser unico: se '_CONFLITO_F_P' ja
+                # existisse, o os.rename falhava e o arquivo nunca era movido.
+                blocked = path_acc
+                quarantine = self._free_name(
+                    blocked + "_CONFLITO_F_P",
+                    lambda n, b=blocked: f"{b}_CONFLITO_F_P_{n}",
+                )
+                logger.warning(f"CONFLITO DETECTADO: O arquivo '{blocked}' impede a criacao da pasta. Renomeando para '{os.path.basename(quarantine)}' para prosseguir.")
+                os.rename(blocked, quarantine)
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def _move_file(self, source: str, destination: str):
-        # Garantir caminhos absolutos e lidar com caminhos longos no Windows (prefixo \\?\)
+        # Garantir caminhos absolutos
         abs_source = os.path.abspath(source)
         abs_dest = os.path.abspath(destination)
-        
+
         if self.dry_run:
             logger.info(f"[DRY RUN] Moveria: {abs_source} -> {abs_dest}")
             return
 
         dest_dir = os.path.dirname(abs_dest)
-        
-        # Validação de conflitos (Arquivo bloqueando pasta)
-        path_acc = ""
-        # Divide o caminho para verificar cada componente
-        # No Windows, removemos o drive para iterar nas pastas
-        drive, path_parts = os.path.splitdrive(dest_dir)
-        path_acc = drive + os.sep
-        for part in path_parts.strip(os.sep).split(os.sep):
-            path_acc = os.path.join(path_acc, part)
-            if os.path.exists(path_acc) and os.path.isfile(path_acc):
-                # Conflito fatal: Existe um arquivo onde deveria ser uma pasta
-                new_path_acc = path_acc + "_CONFLITO_F_P"
-                logger.warning(f"CONFLITO DETECTADO: O arquivo '{path_acc}' impede a criacao da pasta. Renomeando arquivo para prosseguir.")
-                os.rename(path_acc, new_path_acc)
 
         try:
+            # Validacao de conflitos (arquivo bloqueando pasta)
+            self._resolve_conflicts(dest_dir)
+
             os.makedirs(dest_dir, exist_ok=True)
-            
-            # Evita sobrescrever se o arquivo já existir no destino
+
+            # Evita sobrescrever: desambigua com o mtime e, se preciso, com um
+            # contador. shutil.move sobrescreve o destino no Windows, entao o
+            # nome final precisa estar garantidamente livre.
+            base, ext = os.path.splitext(abs_dest)
+
+            def alternative(attempt: int) -> str:
+                # O mtime so e lido quando existe colisao de verdade.
+                stamp = int(os.path.getmtime(abs_source))
+                if attempt == 1:
+                    return f"{base}_{stamp}{ext}"
+                return f"{base}_{stamp}_{attempt - 1}{ext}"
+
+            abs_dest = self._free_name(abs_dest, alternative)
+
+            # Ultima barreira contra perda de dados: nunca sobrescrever.
             if os.path.exists(abs_dest):
-                base, ext = os.path.splitext(abs_dest)
-                abs_dest = f"{base}_{int(os.path.getmtime(abs_source))}{ext}"
+                raise FileExistsError(f"Destino ja existe, movimentacao abortada: {abs_dest}")
 
             shutil.move(abs_source, abs_dest)
             logger.info(f"MOVIDO: {os.path.basename(abs_source)} -> {abs_dest}")
         except Exception as e:
             logger.error(f"FALHA AO MOVER '{os.path.basename(abs_source)}': {str(e)}")
-            raise # Relança para o retry se necessário
+            raise # Relanca para o retry se necessario
 
     def organize(self):
         logger.info(f"Iniciando organização no diretório: {self.base_path} (Modo Simulação: {self.dry_run})")

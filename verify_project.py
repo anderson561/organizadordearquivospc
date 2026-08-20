@@ -4,11 +4,12 @@
 Features:
 - Run unit tests with coverage (coverage report generated).
 - Lint source code using ruff.
-- Execute the compiled executable in **real mode**.
+- Smoke-test the compiled executable in dry-run mode against a throwaway sandbox.
 - Validate build script execution.
 - Consolidate results into a Markdown report at `reports/verification_report.md`.
 """
 import subprocess
+import tempfile
 import sys
 import os
 from pathlib import Path
@@ -53,28 +54,48 @@ def main():
     rc, out, err = run_cmd([sys.executable, "-m", "coverage", "run", "-m", "pytest"], cwd=test_cwd_path)
     write_section("Test Execution (pytest)", out + "\n" + err)
     if rc == 0:
-        # generate coverage report in markdown (run from project root)
-        rc_cov, out_cov, err_cov = run_cmd([sys.executable, "-m", "coverage", "report", "-m"], cwd=str(ADV_ORG))
+        # The .coverage data file lives in the same cwd used by `coverage run`,
+        # so the report must run from there - otherwise it finds no data.
+        rc_cov, out_cov, err_cov = run_cmd([sys.executable, "-m", "coverage", "report", "-m"], cwd=test_cwd_path)
         write_section("Coverage Report", out_cov + "\n" + err_cov)
     else:
         write_section("Test Execution (pytest)", "Tests failed. Skipping coverage.")
 
     # 2. Lint with ruff
     print("Running ruff linter...")
-    rc_lint, out_lint, err_lint = run_cmd([sys.executable, "-m", "ruff", "check", str(ADV_ORG / "src")])
+    lint_targets = [str(ADV_ORG / "src"), str(ADV_ORG / "tests"), str(Path(__file__).resolve())]
+    rc_lint, out_lint, err_lint = run_cmd([sys.executable, "-m", "ruff", "check", *lint_targets])
     write_section("Ruff Linting", out_lint + "\n" + err_lint)
 
-    # 3. Execute binary in real mode
+    # 3. Smoke-test the binary in DRY RUN mode.
+    # Never use --real here: a verification script must not move real files.
+    # A throwaway sandbox is populated so the run has something to classify.
     exe_path = ADV_ORG / "dist" / "OrganizadorArquivos.exe"
     if exe_path.is_file():
-        print("Executing binary in real mode...")
-        # Use the same test_cwd if the binary expects a working directory; otherwise default to ADV_ORG
-        exec_cwd = os.path.abspath(str(ADV_ORG))
-        print(f"[DEBUG] Using exec_cwd: {exec_cwd}")
-        rc_bin, out_bin, err_bin = run_cmd([str(exe_path), "--path", str(BASE_DIR / "test_dummy"), "--real"], cwd=exec_cwd)
-        write_section("Executable (real mode)", out_bin + "\n" + err_bin)
+        print("Smoke-testing binary (dry run)...")
+        with tempfile.TemporaryDirectory(prefix="moverarquivos_verify_") as sandbox:
+            for sample in ("relatorio.txt", "foto.jpg", "planilha.xlsx", "sem_extensao"):
+                Path(sandbox, sample).write_text("sample", encoding="utf-8")
+
+            rc_bin, out_bin, err_bin = run_cmd(
+                [str(exe_path), "--path", sandbox],
+                cwd=os.path.abspath(str(ADV_ORG)),
+            )
+            output = out_bin + "\n" + err_bin
+
+            # The sandbox must be untouched: dry run may not move anything.
+            leftovers = sorted(p.name for p in Path(sandbox).iterdir())
+            dry_run_lines = [ln for ln in output.splitlines() if "[DRY RUN]" in ln]
+
+            verdict = (
+                f"exit code: {rc_bin}\n"
+                f"dry-run entries logged: {len(dry_run_lines)} (expected 4)\n"
+                f"sandbox after run: {leftovers}\n"
+                f"sandbox untouched: {len(leftovers) == 4}\n\n{output}"
+            )
+        write_section("Executable (dry run smoke test)", verdict)
     else:
-        write_section("Executable (real mode)", "Executable not found at " + str(exe_path))
+        write_section("Executable (dry run smoke test)", "Executable not found at " + str(exe_path))
 
     # 4. Run build script (build.bat) silently
     build_bat = ADV_ORG / "build.bat"

@@ -22,11 +22,9 @@ pip-delete-this-directory.txt
 htmlcov/
 .coverage
 .coverage.*
-,coverage.xml
-,tests.xml
 nosetests.xml
 coverage.xml
-*,cover
+*.cover
 *.log
 
 # PyInstaller
@@ -45,8 +43,10 @@ venv/
 *.sublime-project
 *.sublime-workspace
 
-# Obsidian artifacts (notes are in vault, not repo)
-.docs/
+# Obsidian: vault e configuracao NAO pertencem ao repo
+# (o plugin local-rest-api armazena apiKey e chave privada em .obsidian/plugins/)
+Antigravity_python/
+.obsidian/
 
 # Misc
 .DS_Store
@@ -61,3 +61,6 @@ Thumbs.db
 # Antigravity & agent files (local tooling)
 .antigravity/
 .agent/
+.agents/
+.claude/
+.windsurfrules

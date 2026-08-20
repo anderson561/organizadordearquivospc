@@ -1,0 +1,4 @@
+# Dependencias de execucao do MoverArquivos.
+# Versoes fixadas para garantir builds reproduziveis.
+pdfminer.six==20251230
+tenacity==9.1.4

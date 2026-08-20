@@ -117,7 +117,7 @@ class BaseStrategy:
 2. Crie um branch para sua feature (`git checkout -b minha-feature`).
 3. Instale as dependências de desenvolvimento:
    ```bash
-   pip install -r dev-requirements.txt  # inclui pytest, flake8, ruff
+   pip install -r requirements-dev.txt  # inclui pytest, coverage, ruff, pyinstaller
    ```
 4. Escreva testes e garanta que `pytest` passe.
 5. Submeta um Pull Request com descrição clara e changelog.

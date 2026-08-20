@@ -1,0 +1,7 @@
+# Ferramentas de desenvolvimento, testes e empacotamento.
+-r requirements.txt
+
+pytest==9.0.2
+coverage==7.14.1
+ruff==0.15.15
+pyinstaller==6.19.0
