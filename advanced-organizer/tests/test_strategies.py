@@ -6,7 +6,7 @@ import sys
 # Adiciona o diretório src ao path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from strategies import sanitize_path_component, TypeStrategy, ImpostoStrategy, CompanyNameStrategy
+from strategies import sanitize_path_component, TypeStrategy, CompanyNameStrategy
 
 class TestStrategies(unittest.TestCase):
 
@@ -21,33 +21,6 @@ class TestStrategies(unittest.TestCase):
         self.assertEqual(strategy.get_destination_subpath("IMAGE.PNG"), "PNG")
         self.assertEqual(strategy.get_destination_subpath(".gitignore"), "Outros")
         self.assertEqual(strategy.get_destination_subpath("no_extension"), "Outros")
-
-    @patch('strategies.extract_text')
-    def test_imposto_strategy(self, mock_extract):
-        strategy = ImpostoStrategy()
-        
-        # Test non-PDF fallback
-        self.assertEqual(strategy.get_destination_subpath("receipt.txt"), "TXT")
-
-        # Test DARF
-        mock_extract.return_value = "Este é um documento DARF de exemplo"
-        self.assertEqual(strategy.get_destination_subpath("imposto.pdf"), "DARF")
-
-        # Test DAS
-        mock_extract.return_value = "Guia do DAS do Simples Nacional"
-        self.assertEqual(strategy.get_destination_subpath("imposto.pdf"), "DAS - Simples Nacional")
-
-        # Test IPTU
-        mock_extract.return_value = "Carnê de IPTU 2026"
-        self.assertEqual(strategy.get_destination_subpath("imposto.pdf"), "IPTU")
-
-        # Test General Taxes
-        mock_extract.return_value = "Outro tipo de taxa qualquer"
-        self.assertEqual(strategy.get_destination_subpath("imposto.pdf"), "Impostos Gerais")
-
-        # Test Exception handling
-        mock_extract.side_effect = Exception("Erro ao ler PDF")
-        self.assertEqual(strategy.get_destination_subpath("imposto.pdf"), "Impostos - Erro na Leitura")
 
     @patch('strategies.extract_text')
     def test_company_name_strategy(self, mock_extract):

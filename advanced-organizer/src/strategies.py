@@ -2,8 +2,11 @@ import os
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
+from typing import NamedTuple, Optional, Tuple
 from pdfminer.high_level import extract_text
+from pdfminer.pdfdocument import PDFDocument
+from pdfminer.pdfparser import PDFParser
+from document_terms import match_term
 
 def sanitize_path_component(name: str) -> str:
     """Remove caracteres inválidos para nomes de pastas no Windows."""
@@ -27,28 +30,161 @@ class TypeStrategy(BaseStrategy):
             return "Outros"
         return sanitize_path_component(ext.upper())
 
-class ImpostoStrategy(BaseStrategy):
-    """Organiza Impostos lendo o conteúdo do PDF."""
-    KEYWORDS = {
-        "DARF": "DARF",
-        "DAS": "DAS - Simples Nacional",
-        "IPTU": "IPTU",
-        "IPVA": "IPVA",
-        "GRERJ": "GRERJ",
-    }
+def _decode_pdf_string(raw) -> str:
+    """Decodifica uma string de metadado PDF (bytes latin-1 ou UTF-16 com BOM)."""
+    if isinstance(raw, bytes):
+        if raw[:2] in (b"\xfe\xff", b"\xff\xfe"):
+            return raw.decode("utf-16", "ignore")
+        return raw.decode("latin-1", "ignore")
+    return str(raw or "")
+
+
+def _looks_like_title(candidate: str) -> bool:
+    """Descarta metadados /Title que não são titulo de verdade.
+
+    Geradores de PDF costumam preencher /Title com o nome do arquivo de origem
+    ('Microsoft Word - doc1.docx'), com placeholders ou com hashes.
+    """
+    text = candidate.strip()
+    if len(text) < 3:
+        return False
+    low = text.lower()
+    if low.startswith(("microsoft word -", "microsoft excel -", "microsoft powerpoint -")):
+        return False
+    if low.endswith((".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx")):
+        return False
+    if low in {"untitled", "document", "documento", "sem titulo", "sem título"}:
+        return False
+    if not re.search(r"[^\W\d_]{3}", text):      # precisa conter letras, não só números
+        return False
+    if re.fullmatch(r"[0-9a-f]{16,}", low):      # hash / uuid
+        return False
+    return True
+
+
+def _pdf_metadata_title(file_path: str) -> str:
+    """Título declarado nos metadados do PDF, ou string vazia."""
+    try:
+        with open(file_path, "rb") as handle:
+            document = PDFDocument(PDFParser(handle))
+            for info in document.info or []:
+                candidate = _decode_pdf_string(info.get("Title"))
+                if _looks_like_title(candidate):
+                    return candidate.strip()
+    except Exception:
+        pass       # metadado ausente ou ilegível não impede a leitura do cabeçalho
+    return ""
+
+
+_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def filename_hint(file_path: str) -> str:
+    """O nome do arquivo como sinal de classificação.
+
+    Costuma ser o sinal mais confiável na prática: um DARF emitido pela Receita
+    não traz a sigla 'DARF' em lugar nenhum do conteúdo (o cabeçalho diz
+    'Documento de Arrecadação'), mas o nome do arquivo quase sempre traz.
+
+    Separadores viram espaço e limites camelCase são quebrados, para que
+    'NotaFiscalNFSe_01.xml' também possa casar.
+    """
+    stem = os.path.splitext(os.path.basename(file_path))[0]
+    spaced = re.sub(r"[_\-.]+", " ", stem)
+    spaced = _CAMEL_BOUNDARY.sub(" ", spaced)
+    return re.sub(r"\s+", " ", spaced).strip()
+
+
+class TitleRegion(NamedTuple):
+    """Os lugares de um documento onde o título pode estar."""
+    metadata: str      # /Title, se plausível
+    heading: str       # primeiras linhas da página 1
+    filename: str      # nome do arquivo, normalizado
+
+    @property
+    def text(self) -> str:
+        """Trecho usado para casar o vocabulário."""
+        return "\n".join(part for part in (self.metadata, self.heading, self.filename) if part)
+
+    @property
+    def display(self) -> str:
+        """Título legível, para relatórios."""
+        if self.metadata:
+            return self.metadata
+        if self.heading:
+            return self.heading.splitlines()[0]
+        return self.filename
+
+
+# Marcador que o pdfminer emite quando a fonte embutida nao traz mapa
+# ToUnicode. Varios DAMs de prefeitura sao assim: o cabecalho sai como
+# "(cid:0)(cid:1)(cid:2)..." em vez de texto.
+_CID_NOISE = re.compile(r"\(cid:\d+\)")
+
+
+def _clean_line(line: str) -> str:
+    """Limpa uma linha da regiao de titulo, devolvendo '' se nada restar.
+
+    Descartar as linhas que sobram vazias e o que importa: a janela tem apenas
+    5 linhas, e sem isso o ruido de (cid:N) ocupava todas elas e escondia o
+    cabecalho legivel que vinha logo abaixo.
+    """
+    return re.sub(r"\s+", " ", _CID_NOISE.sub(" ", line)).strip()
+
+
+def extract_title_region(file_path: str, max_lines: int = 5) -> TitleRegion:
+    """Extrai a região de título de um PDF.
+
+    Lê apenas a primeira página: o casamento acontece no título, não no corpo,
+    e isso também torna a classificação bem mais rápida que ler o documento
+    inteiro.
+    """
+    text = extract_text(file_path, maxpages=1) or ""
+    lines = [clean for clean in map(_clean_line, text.splitlines()) if clean][:max_lines]
+    return TitleRegion(
+        _pdf_metadata_title(file_path),
+        "\n".join(lines),
+        filename_hint(file_path),
+    )
+
+
+class DocumentTitleStrategy(BaseStrategy):
+    """Classifica documentos pelo termo encontrado no título.
+
+    PDFs são lidos internamente; um termo reconhecido define a pasta no plural
+    (DARF -> 'DARFs'). PDFs sem termo reconhecido e arquivos não-PDF caem na
+    estratégia de reserva, preservando a organização por extensão.
+    """
+    ERROR_FOLDER = "Erro na Leitura"
+
+    def __init__(self, max_title_lines: int = 5, fallback: Optional[BaseStrategy] = None):
+        self.max_title_lines = max_title_lines
+        self.fallback = fallback or TypeStrategy()
+
+    def classify(self, file_path: str) -> Tuple[Optional[str], TitleRegion]:
+        """Devolve (pasta, região de título) - usado pelo modo relatório."""
+        if file_path.lower().endswith('.pdf'):
+            region = extract_title_region(file_path, self.max_title_lines)
+        else:
+            # Não-PDF: só o nome do arquivo serve de sinal.
+            region = TitleRegion("", "", filename_hint(file_path))
+
+        entry = match_term(region.text)
+        folder = sanitize_path_component(entry.folder_name) if entry else None
+        return folder, region
 
     def get_destination_subpath(self, file_path: str) -> Optional[str]:
-        if not file_path.lower().endswith('.pdf'):
-            return TypeStrategy().get_destination_subpath(file_path)
-        
         try:
-            text = extract_text(file_path).upper()
-            for key, folder in self.KEYWORDS.items():
-                if key in text:
-                    return folder
-            return "Impostos Gerais"
+            folder, _ = self.classify(file_path)
         except Exception:
-            return "Impostos - Erro na Leitura"
+            if file_path.lower().endswith('.pdf'):
+                return self.ERROR_FOLDER
+            return self.fallback.get_destination_subpath(file_path)
+
+        if folder:
+            return folder
+        # Sem termo reconhecido: mantém o comportamento por extensão.
+        return self.fallback.get_destination_subpath(file_path)
 
 class CompanyNameStrategy(BaseStrategy):
     """Extrai Ano / Mês / Empresa de Notas Fiscais."""

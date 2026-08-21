@@ -25,7 +25,7 @@ class TestNoDataLoss(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.base, ignore_errors=True)
 
     def _drop_file(self, content, mtime):
-        path = os.path.join(self.base, "relatorio.txt")
+        path = os.path.join(self.base, "arquivo.txt")
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(content)
         os.utime(path, (mtime, mtime))
