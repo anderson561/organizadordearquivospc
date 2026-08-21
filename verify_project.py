@@ -4,7 +4,7 @@
 Features:
 - Run unit tests with coverage (coverage report generated).
 - Lint source code using ruff.
-- Smoke-test the compiled executable in dry-run mode against a throwaway sandbox.
+- Smoke-test the CLI in dry-run mode against a throwaway sandbox.
 - Validate build script execution.
 - Consolidate results into a Markdown report at `reports/verification_report.md`.
 """
@@ -21,11 +21,17 @@ REPORTS_DIR = BASE_DIR / "reports"
 REPORT_FILE = REPORTS_DIR / "verification_report.md"
 
 def run_cmd(command, cwd=None, shell=False):
-    """Run a shell command, capture output, and return (returncode, stdout, stderr)."""
+    """Run a shell command, capture output, and return (returncode, stdout, stderr).
+
+    stdin is closed on purpose: build.bat ends with `pause`, which would block
+    this script forever waiting for a keypress that never comes. With DEVNULL
+    the pause reads EOF and returns immediately.
+    """
     result = subprocess.run(
         command,
         cwd=cwd,
         shell=shell,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -67,42 +73,52 @@ def main():
     rc_lint, out_lint, err_lint = run_cmd([sys.executable, "-m", "ruff", "check", *lint_targets])
     write_section("Ruff Linting", out_lint + "\n" + err_lint)
 
-    # 3. Smoke-test the binary in DRY RUN mode.
+    # 3. Smoke-test the CLI in DRY RUN mode.
     # Never use --real here: a verification script must not move real files.
     # A throwaway sandbox is populated so the run has something to classify.
-    exe_path = ADV_ORG / "dist" / "OrganizadorArquivos.exe"
-    if exe_path.is_file():
-        print("Smoke-testing binary (dry run)...")
-        with tempfile.TemporaryDirectory(prefix="moverarquivos_verify_") as sandbox:
-            for sample in ("relatorio.txt", "foto.jpg", "planilha.xlsx", "sem_extensao"):
-                Path(sandbox, sample).write_text("sample", encoding="utf-8")
+    # Only the GUI is packaged as an .exe, and a --windowed binary cannot be
+    # driven from a console: it prints nothing to stdout and opens a window
+    # that would block this script. So the CLI is exercised through the
+    # interpreter - which is also how the docs tell you to run it.
+    cli_path = ADV_ORG / "src" / "organizer.py"
+    print("Smoke-testing CLI (dry run)...")
+    with tempfile.TemporaryDirectory(prefix="moverarquivos_verify_") as sandbox:
+        for sample in ("relatorio.txt", "foto.jpg", "planilha.xlsx", "sem_extensao"):
+            Path(sandbox, sample).write_text("sample", encoding="utf-8")
 
-            rc_bin, out_bin, err_bin = run_cmd(
-                [str(exe_path), "--path", sandbox],
-                cwd=os.path.abspath(str(ADV_ORG)),
-            )
-            output = out_bin + "\n" + err_bin
+        rc_bin, out_bin, err_bin = run_cmd(
+            [sys.executable, str(cli_path), "--path", sandbox],
+            cwd=os.path.abspath(str(ADV_ORG)),
+        )
+        output = out_bin + "\n" + err_bin
 
-            # The sandbox must be untouched: dry run may not move anything.
-            leftovers = sorted(p.name for p in Path(sandbox).iterdir())
-            dry_run_lines = [ln for ln in output.splitlines() if "[DRY RUN]" in ln]
+        # The sandbox must be untouched: dry run may not move anything.
+        leftovers = sorted(p.name for p in Path(sandbox).iterdir())
+        dry_run_lines = [ln for ln in output.splitlines() if "[DRY RUN]" in ln]
 
-            verdict = (
-                f"exit code: {rc_bin}\n"
-                f"dry-run entries logged: {len(dry_run_lines)} (expected 4)\n"
-                f"sandbox after run: {leftovers}\n"
-                f"sandbox untouched: {len(leftovers) == 4}\n\n{output}"
-            )
-        write_section("Executable (dry run smoke test)", verdict)
-    else:
-        write_section("Executable (dry run smoke test)", "Executable not found at " + str(exe_path))
+        verdict = (
+            f"exit code: {rc_bin}\n"
+            f"dry-run entries logged: {len(dry_run_lines)} (expected 4)\n"
+            f"sandbox after run: {leftovers}\n"
+            f"sandbox untouched: {len(leftovers) == 4}\n\n{output}"
+        )
+    write_section("CLI (dry run smoke test)", verdict)
 
     # 4. Run build script (build.bat) silently
     build_bat = ADV_ORG / "build.bat"
     if build_bat.is_file():
         print("Running build.bat...")
         rc_build, out_build, err_build = run_cmd(["cmd", "/c", str(build_bat)], cwd=str(ADV_ORG))
-        write_section("Build Script Output", out_build + "\n" + err_build)
+        # O build produz um unico executavel: a interface grafica.
+        dist_dir = ADV_ORG / "dist"
+        gui_exe = dist_dir / "OrganizadorArquivosGUI.exe"
+        produced = sorted(f.name for f in dist_dir.glob("*.exe")) if dist_dir.is_dir() else []
+        write_section(
+            "Build Script Output",
+            f"exit code: {rc_build}\n"
+            f"OrganizadorArquivosGUI.exe present: {gui_exe.is_file()}\n"
+            f"executables in dist/: {produced}\n\n" + out_build + "\n" + err_build,
+        )
     else:
         write_section("Build Script Output", "build.bat not found.")
 
