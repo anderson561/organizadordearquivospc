@@ -245,7 +245,7 @@ class FileOrganizer:
             )
             logger.warning(
                 "Para mover os arquivos, rode novamente com --real "
-                "(ou use o atalho executar_real.bat)."
+                "(ou use a interface grafica, que mostra a tabela antes de mover)."
             )
         else:
             logger.info(
