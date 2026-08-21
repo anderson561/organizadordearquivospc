@@ -2,10 +2,10 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-76%20passed-green.svg)]()
-[![Coverage](https://img.shields.io/badge/coverage-93%25-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-88%20passed-green.svg)]()
+[![Coverage](https://img.shields.io/badge/coverage-94%25-green.svg)]()
 
-Um sistema inteligente e resiliente desenvolvido em Python para a organização automatizada e estruturada de diretórios, com foco no Desktop e pastas customizadas do usuário. O projeto lê extensões de arquivos, analisa o conteúdo textual de arquivos PDF para classificar guias de impostos e realiza parsing de metadados complexos em Notas Fiscais eletrônicas.
+Um sistema resiliente em Python para organização automatizada de diretórios, com interface gráfica. Classifica documentos pelo **título** — lendo o nome do arquivo, os metadados e o cabeçalho do PDF —, faz parsing de metadados de Notas Fiscais eletrônicas e, como reserva, organiza por extensão. Analisar e mover são etapas separadas: nada sai do lugar sem revisão e confirmação.
 
 ---
 
@@ -16,7 +16,7 @@ O software adota o padrão de projeto **Strategy** para desacoplar e aplicar reg
 1. **Documentos de Notas Fiscais (`CompanyNameStrategy`):**
    * Processa arquivos PDF no diretório `Notas/`.
    * Realiza extração do texto interno e busca padrões de data e Razão Social do emitente.
-   * Cria uma estrutura organizada e limpa de diretórios: `[Ano] / [Mês] / [Nome_da_Empresa]`.
+   * Cria a estrutura `[Ano] / [MM - Mês] / [Nome da Empresa]`, por exemplo `2026 / 08 - Agosto / MINIMERCADO BOCA DO RIO LTDA`. Sem data legível usa o mês corrente; sem razão social, `Desconhecido`.
 
 2. **Documentos por Título (`DocumentTitleStrategy`):**
    * Procura um termo conhecido na **região de título**, que reúne três sinais: o **nome do arquivo**, o metadado `/Title` e as primeiras linhas da página 1 — nunca o corpo inteiro do documento.

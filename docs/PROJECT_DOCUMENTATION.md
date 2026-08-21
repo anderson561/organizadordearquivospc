@@ -4,52 +4,70 @@
 
 ## 📖 Visão Geral
 
-`MoverArquivos` é um utilitário para Windows, escrito em Python, que organiza arquivos em pastas com base em estratégias de classificação: **título do documento**, metadados de nota fiscal e extensão do arquivo. A interface gráfica é a forma recomendada de uso; a linha de comando atende automação e diagnóstico.
+`MoverArquivos` é um utilitário para Windows, escrito em Python, que organiza
+arquivos em pastas com base em estratégias de classificação: **título do
+documento**, metadados de nota fiscal e extensão do arquivo. A interface gráfica
+é a forma recomendada de uso; a linha de comando atende automação e diagnóstico.
 
-- **Modo Simulação** (padrão) – apenas relata o que seria movido.
-- **Modo Real** – executa a movimentação de fato.
-- **Modo Relatório** (`--report`) – lista o título detectado e a pasta de destino de cada arquivo, sem mover nada.
-- **Interface Gráfica** – `OrganizadorArquivosGUI.exe` abre uma janela com seleção de pasta, análise prévia (que não move nada), progresso, cancelamento e confirmação antes de mover.
+- **Interface Gráfica** – `OrganizadorArquivosGUI.exe` abre uma janela com
+  seleção de pasta, análise prévia (que não move nada), progresso, cancelamento
+  e confirmação antes de mover.
+- **Modo Simulação** (padrão na CLI) – apenas registra o que seria movido.
+- **Modo Real** (`--real`) – executa a movimentação de fato.
+- **Modo Relatório** (`--report`) – lista o título detectado e a pasta de destino
+  de cada arquivo, sem mover nada.
 
-O projeto está estruturado como um **pacote Python** (`advanced‑organizer`) contendo a lógica de organização. O PyInstaller empacota **um único executável**, o da interface gráfica (`OrganizadorArquivosGUI.exe`); a linha de comando é usada pelo interpretador.
+O código-fonte vive em `advanced-organizer/src/`. **Não é um pacote importável**:
+o diretório tem hífen no nome e não há `__init__.py`, então os módulos são
+carregados por caminho (veja *Módulo Python*, abaixo). O PyInstaller empacota
+**um único executável**, o da interface gráfica.
 
 ---
 
 ## 🛠️ Instalação
 
-1. **Pré‑requisitos**
-   - Python 3.10 ou superior
-   - `pip` (gerenciador de pacotes)
-   - Windows 10/11 (o executável foi empacotado para Windows)
+1. **Pré-requisitos**
+   - Python 3.13+ (versão em que o projeto é testado)
+   - Windows 10/11 (o executável é empacotado para Windows)
 
-2. **Instalar dependências**
+2. **Instalar dependências** — a partir da **raiz do repositório**, onde ficam os
+   arquivos de requisitos:
    ```bash
-   cd C:/python/moverarquivos/advanced-organizer
+   cd C:/python/moverarquivos
    python -m venv .venv
-   .venv\Scripts\activate   # PowerShell: .\.venv\Scripts\Activate.ps1
-   pip install -r requirements.txt
+   .venv\Scripts\python.exe -m pip install -r requirements.txt
    ```
+   Para desenvolver (testes, lint, empacotamento), use `requirements-dev.txt`,
+   que inclui as dependências de execução.
 
-3. **Compilar o executável (opcional)**
+3. **Compilar o executável (opcional)** — a partir de `advanced-organizer/`:
    ```bash
-   pip install pyinstaller
-   pyinstaller --onefile --windowed --name OrganizadorArquivosGUI src/gui.py
+   build.bat
    ```
-   O binário será colocado em `dist/OrganizadorArquivosGUI.exe`. O script
-   `build.bat` faz exatamente isso, preferindo o interpretador da venv.
+   O script prefere o interpretador da venv do projeto e gera
+   `dist/OrganizadorArquivosGUI.exe`. Equivale a:
+   ```bash
+   python -m PyInstaller --onefile --windowed --name OrganizadorArquivosGUI src\gui.py
+   ```
 
 ---
 
 ## ▶️ Uso
 
-### Executável (interface gráfica)
+### Interface gráfica
 ```bat
 dist\OrganizadorArquivosGUI.exe
 ```
-Informe a pasta, clique em **Analisar** (que nunca move nada) e só então em
-**Mover arquivos**, que pede confirmação declarando a quantidade.
+Informe a pasta, clique em **Analisar** (que nunca move nada), revise a tabela
+`arquivo → título detectado → pasta` e só então use **Mover arquivos**, que pede
+confirmação declarando a quantidade.
+
+O fluxo tem duas etapas de propósito: analisar **nunca** move nada. Isso elimina
+pela estrutura o mal-entendido de rodar a ferramenta, ver log passando na tela e
+não perceber que nada aconteceu.
 
 ### Linha de comando
+A partir de `advanced-organizer/`:
 ```bat
 rem Relatório: classificação de cada arquivo, sem mover nada
 ..\.venv\Scripts\python.exe src\organizer.py --path "C:\pasta" --report
@@ -64,14 +82,6 @@ rem Sem --path: abre um seletor de pasta
 ..\.venv\Scripts\python.exe src\organizer.py --real
 ```
 
-### Módulo Python
-```python
-from advanced_organizer.src.organizer import FileOrganizer
-
-organizer = FileOrganizer(base_path="C:/Users/ANDERSON/Desktop", dry_run=False)
-organizer.organize()
-```
-
 ### Argumentos de linha de comando
 | Argumento | Descrição | Valor padrão |
 |-----------|-----------|--------------|
@@ -79,29 +89,57 @@ organizer.organize()
 | `--real`  | Executa a movimentação real (caso contrário, só simulação). | `False` |
 | `--report`| Lista o título detectado e a pasta de destino de cada arquivo, sem mover nada. | `False` |
 
+### Módulo Python
+Como `advanced-organizer` não é um pacote importável, acrescente `src/` ao
+`sys.path` — é o que os testes fazem:
+```python
+import sys
+sys.path.append(r"C:\python\moverarquivos\advanced-organizer\src")
+
+from organizer import FileOrganizer
+
+# Decidir e executar são etapas separadas.
+planos = FileOrganizer(base_path=r"C:\Users\ANDERSON\Desktop", dry_run=True).classify_all()
+for p in planos:
+    print(p.name, "->", p.folder, "| titulo:", p.title)
+
+# Para mover de verdade, um organizer com dry_run=False.
+resumo = FileOrganizer(base_path=r"C:\Users\ANDERSON\Desktop", dry_run=False).apply_plans(planos)
+print(resumo.movidos, "movidos,", resumo.falhas, "falhas")
+```
+
 ---
 
 ## 🏗️ Arquitetura
 
 ```
-advanced-organizer/
+moverarquivos/
 │
-├─ src/
-│   ├─ organizer.py      # Core da aplicação (classe FileOrganizer)
-│   ├─ strategies.py     # Estratégias (Título do documento, Empresa, Tipo)
-│   ├─ document_terms.py # Vocabulário de termos e regras de plural
-│   └─ gui.py            # Interface gráfica (tkinter)
+├─ advanced-organizer/
+│   ├─ src/
+│   │   ├─ organizer.py      # Core da aplicação (classe FileOrganizer)
+│   │   ├─ strategies.py     # Estratégias (Título do documento, Empresa, Tipo)
+│   │   ├─ document_terms.py # Vocabulário de termos e regras de plural
+│   │   └─ gui.py            # Interface gráfica (tkinter)
+│   ├─ tests/                # Testes (pytest) e gerador de PDF de fixture
+│   ├─ build.bat             # Empacota a interface gráfica com PyInstaller
+│   ├─ dist/                 # Saída do build (OrganizadorArquivosGUI.exe)
+│   └─ README.md             # Documentação interna do módulo
 │
-├─ tests/                # Testes unitários (pytest)
-├─ docs/                 # Esta documentação
-├─ build.bat             # Empacota a interface gráfica com PyInstaller
-└─ dist/                 # Saída do build (OrganizadorArquivosGUI.exe)
+├─ docs/                     # Esta documentação
+├─ reports/                  # Saída de verify_project.py
+├─ requirements.txt          # Dependências de execução (fixadas)
+├─ requirements-dev.txt      # Testes, lint e empacotamento
+└─ verify_project.py         # Testes + cobertura + lint + smoke test + build
 ```
 
-- **`FileOrganizer`**: gerencia caminhos‑e‑estratégias, itera sobre diretórios e delega a movimentação.
-- **`BaseStrategy`** e subclasses (`DocumentTitleStrategy`, `CompanyNameStrategy`, `TypeStrategy`) determinam a sub‑pasta de destino para cada arquivo.
-- **`_move_file`**: encapsula a lógica de criação de diretórios, resolução de conflitos e retry com *tenacity*.
-- **Logging**: configurado para `INFO` e inclui timestamps no formato ISO‑8601.
+- **`FileOrganizer`**: mapeia pastas para estratégias, itera sobre os arquivos e
+  delega a movimentação.
+- **`BaseStrategy`** e subclasses (`DocumentTitleStrategy`, `CompanyNameStrategy`,
+  `TypeStrategy`) determinam a subpasta de destino de cada arquivo.
+- **`_move_file`**: criação de diretórios, resolução de conflitos, garantia de
+  não sobrescrita e retry com *tenacity*.
+- **Logging**: nível `INFO`, com data e hora em cada linha.
 
 ---
 
@@ -111,36 +149,100 @@ advanced-organizer/
 ```python
 class FileOrganizer:
     def __init__(self, base_path: str = r"C:\Users\ANDERSON\Desktop", dry_run: bool = True)
-    def organize(self, progress=None, cancel=None) -> Summary
     def classify_all(self, progress=None, cancel=None) -> List[FilePlan]
     def apply_plans(self, plans, progress=None, cancel=None) -> Summary
+    def organize(self, progress=None, cancel=None) -> Summary
     def report(self) -> List[FilePlan]
 ```
 - **`base_path`** – diretório raiz a ser organizado.
 - **`dry_run`** – se `True`, apenas registra as ações.
-- **`classify_all` / `apply_plans`** – decidir e executar são etapas separadas, para a interface poder mostrar a tabela para revisão sem reler os PDFs na hora de mover.
+- **`classify_all` / `apply_plans`** – decidir e executar são etapas separadas,
+  para a interface mostrar a tabela de revisão sem reler os PDFs na hora de mover.
+- **`progress(feitos, total, plano)`** e **`cancel() -> bool`** – ganchos usados
+  pela interface para barra de progresso e cancelamento.
+- **`FilePlan`** – `(name, path, title, folder, recognized)`. `recognized` é
+  `False` quando nenhum termo do vocabulário casou.
+- **`Summary`** – `(analisados, movidos, falhas)`.
 
 ### Estratégias (`strategies.py`)
 ```python
 class BaseStrategy:
     def get_destination_subpath(self, source_path: str) -> Optional[str]
 ```
-- **`DocumentTitleStrategy`** – lê o título do PDF e agrupa por termo, em pastas no plural (`DARFs`, `Relatórios`). Vocabulário em `src/document_terms.py`. As guias de arrecadação se separam por **jurisdição** — `DAMs` (municipal), `DAEs` (estadual) e `DARFs` (federal) — porque as três começam com a frase "Documento de Arrecadação".
-- **`CompanyNameStrategy`** – move documentos empresariais para `Notas/`.
-- **`TypeStrategy`** – classifica por extensão (PDF, IMG, DOC, etc.) em sub‑pastas apropriadas.
+- **`DocumentTitleStrategy`** – procura um termo do vocabulário na região de
+  título (nome do arquivo + metadado `/Title` + primeiras linhas da página 1) e
+  devolve a pasta no plural (`DARFs`, `Relatórios`). PDF sem termo reconhecido
+  cai na `TypeStrategy` de reserva. As guias de arrecadação se separam por
+  **jurisdição** — `DAMs` (municipal), `DAEs` (estadual) e `DARFs` (federal) —
+  porque as três começam com a frase "Documento de Arrecadação", e a federal
+  precisa vir completa ("de Receitas Federais").
+- **`CompanyNameStrategy`** – para notas fiscais. Extrai a primeira data e a
+  razão social do PDF e devolve o caminho `[Ano]/[MM - Mês]/[Empresa]`, por
+  exemplo `2026/08 - Agosto/MINIMERCADO BOCA DO RIO LTDA`. Sem data legível usa
+  o mês corrente; sem razão social, `Desconhecido`. Arquivo não-PDF cai na
+  `TypeStrategy`.
+- **`TypeStrategy`** – devolve a extensão em maiúsculas como nome de pasta
+  (`.jpg` → `JPG`, `.xlsx` → `XLSX`). Arquivo sem extensão vai para `Outros`.
+
+### Onde cada estratégia é montada
+`FileOrganizer` associa cada pasta a uma estratégia:
+
+| Pasta | Estratégia |
+|---|---|
+| `<base>` | `DocumentTitleStrategy` |
+| `<base>/Impostos` | `DocumentTitleStrategy` |
+| `<base>/Notas` | `CompanyNameStrategy` |
+
+A varredura **não é recursiva**: só os arquivos diretamente dentro dessas pastas
+são considerados.
+
+---
+
+## 🔤 Estendendo o vocabulário
+
+Cada entrada de `TERMS` em `src/document_terms.py` declara o termo no singular; o
+nome da pasta é derivado pelas regras de plural do português (`certidão` →
+`Certidões`, `edital` → `Editais`, `DARF` → `DARFs`).
+
+```python
+Term("alvará")                                   # -> Alvarás
+Term("DAM", acronym=True)                        # -> DAMs
+Term("nota fiscal", folder="Notas Fiscais")      # nome de pasta explícito
+Term("DAS", acronym=True, requires=("SIMPLES NACIONAL",))
+```
+
+A ordem de `TERMS` é a precedência: o primeiro termo que casar vence, então os
+mais específicos vêm antes dos genéricos. `requires` é corroboração obrigatória
+para termos ambíguos — sem ela, `DAS` casaria com a preposição "das".
+
+Use `--report` para descobrir quais títulos dos seus documentos ainda não têm
+termo: a lista de "sem termo reconhecido" é exatamente o insumo dessa tarefa.
+
+---
+
+## 🧪 Verificação
+
+A partir da raiz do repositório:
+```bash
+.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 88 testes
+.venv\Scripts\python.exe verify_project.py                    # + cobertura, lint, smoke test e build
+```
+`verify_project.py` grava `reports/verification_report.md` com testes, cobertura,
+lint, smoke test da CLI em dry run e a lista de executáveis que o build produziu.
 
 ---
 
 ## 🤝 Contribuindo
 
-1. Fork o repositório.
-2. Crie um branch para sua feature (`git checkout -b minha-feature`).
-3. Instale as dependências de desenvolvimento:
+1. Crie um branch para a mudança (`git checkout -b minha-feature`).
+2. Instale as dependências de desenvolvimento a partir da raiz:
    ```bash
-   pip install -r requirements-dev.txt  # inclui pytest, coverage, ruff, pyinstaller
+   .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
    ```
-4. Escreva testes e garanta que `pytest` passe.
-5. Submeta um Pull Request com descrição clara e changelog.
+3. Escreva testes. Mudança de classificação precisa de teste com PDF de verdade —
+   use o gerador em `tests/pdf_fixtures.py`.
+4. Rode `verify_project.py` e garanta testes e lint limpos.
+5. Atualize esta documentação e o changelog abaixo **antes** de subir.
 
 ---
 
@@ -148,18 +250,19 @@ class BaseStrategy:
 
 | Versão | Data | Alterações |
 |--------|------|------------|
-| 1.0.0  | 2026‑06‑01 | Lançamento inicial – organização por tipo, UI de seleção de pasta, modo simulação/real. |
+| 1.0.0  | 2026-06-01 | Lançamento inicial – organização por tipo, UI de seleção de pasta, modo simulação/real. |
 | 1.1.0  | 2026-06-03 | Integração de `ruff` como linter, relatório de cobertura, script de verificação automatizado. |
 | 1.2.0  | 2026-08-20 | Classificação por título do documento com vocabulário extensível e plural do português. Remoção da `ImpostoStrategy`, que casava `DAS` por substring. Correção de dois bugs de perda de arquivos. |
 | 1.3.0  | 2026-08-20 | Interface gráfica em tkinter: análise em duas etapas, progresso, cancelamento e confirmação antes de mover. |
 | 1.4.0  | 2026-08-21 | Guias de arrecadação separadas por jurisdição (`DAMs`, `DAEs`, `DARFs`). Limpeza do ruído `(cid:N)` de PDFs sem mapa ToUnicode. |
 | 1.4.1  | 2026-08-21 | Empacotamento apenas da interface gráfica; atalhos `.bat` de console removidos. |
+| 1.4.2  | 2026-08-21 | Revisão completa da documentação: instruções de instalação e exemplo de import que não funcionavam, descrições de `CompanyNameStrategy` e `TypeStrategy` divergentes do código, árvore de arquivos incorreta. |
 
 ---
 
 ## 📞 Contato
 
-- **Autor**: Anderson 561 (GitHub: `anderson561`)
+- **Autor**: Anderson 561 (GitHub: `anderson561`)
 - **Contato e issues**: abra tickets em <https://github.com/anderson561/moverarquivos/issues>
 
 ---
