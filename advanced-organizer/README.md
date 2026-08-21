@@ -5,7 +5,11 @@ Uma solução em Python desenvolvida sob princípios SOLID para a organização 
 ## 🎯 Funcionalidades
 
 *   **Organização por Tipo de Arquivo (`TypeStrategy`):** Agrupa arquivos comuns (como `.png`, `.jpg`, `.mp4`, `.txt`, `.xlsx`) em pastas correspondentes à sua extensão em letras maiúsculas.
-*   **Identificação Inteligente de Impostos (`ImpostoStrategy`):** Lê o conteúdo de arquivos PDF buscando palavras-chave como `DARF`, `DAS`, `IPTU`, `IPVA` e `GRERJ`, organizando-os em pastas apropriadas.
+*   **Classificação por Título do Documento (`DocumentTitleStrategy`):** Procura um termo conhecido na **região de título**, formada por três sinais complementares: o **nome do arquivo**, o metadado `/Title` e as primeiras linhas da página 1 (nunca o corpo inteiro). A pasta recebe o termo no plural — `DARF` → `DARFs`, `relatório` → `Relatórios`, `nota fiscal` → `Notas Fiscais`. O vocabulário vive em `src/document_terms.py`.
+
+    As guias de arrecadação se separam por **jurisdição**, não pela frase genérica: municipal (`DAM` → `DAMs`), estadual (`DAE` → `DAEs`) e federal (`DARF` → `DARFs`). As três começam com "Documento de Arrecadação", então tratar essa frase como termo único mandava as três para `DARFs` — a frase federal precisa vir completa ("de Receitas Federais").
+
+    O casamento é deliberadamente conservador: respeita limite de palavra, e acrônimos ambíguos exigem caixa alta e corroboração no título. Sem isso, `DAS` casaria dentro de "VENDAS" e a preposição "das" viraria guia do Simples Nacional. Os demais acrônimos casam em qualquer caixa, porque não são palavras do português — é o que permite reconhecer nomes de arquivo, sempre minúsculos (`andre darf irrf 052026.pdf`). PDF sem termo reconhecido cai na organização por extensão — melhor não classificar do que classificar errado.
 *   **Extração de Metadados de Notas Fiscais (`CompanyNameStrategy`):** Identifica e extrai automaticamente o Ano, o Mês e a Razão Social da empresa emitente no conteúdo do PDF para criar pastas estruturadas sob o formato `[Ano] / [Mês] / [Nome da Empresa]`.
 *   **Resolução de Conflitos e Duplicados:**
     *   Evita sobrescrever arquivos usando sufixo de timestamp baseado na data de modificação (`mtime`), com contador incremental caso esse nome também já esteja ocupado. O destino é reconferido antes do move: se ainda estiver em uso, a movimentação é abortada em vez de sobrescrever.
@@ -37,7 +41,9 @@ classDiagram
     class TypeStrategy {
         +get_destination_subpath(file_path: str) Optional~str~
     }
-    class ImpostoStrategy {
+    class DocumentTitleStrategy {
+        +fallback: BaseStrategy
+        +classify(file_path: str) Tuple
         +get_destination_subpath(file_path: str) Optional~str~
     }
     class CompanyNameStrategy {
@@ -48,36 +54,52 @@ classDiagram
         +base_path: str
         +paths_and_strategies: Dict
         +organize()
+        +report()
         -_move_file(source: str, destination: str)
     }
 
     BaseStrategy <|-- TypeStrategy
-    BaseStrategy <|-- ImpostoStrategy
+    BaseStrategy <|-- DocumentTitleStrategy
     BaseStrategy <|-- CompanyNameStrategy
     FileOrganizer --> BaseStrategy : Usa
+    DocumentTitleStrategy --> TypeStrategy : Reserva
 ```
 
 ---
 
 ## 🚀 Como Executar
 
-Você pode executar o projeto usando o interpretador do Python ou executando diretamente o binário `.exe` na pasta `dist/`.
+Use a interface gráfica (recomendado) ou a linha de comando pelo interpretador do Python. O build empacota **apenas a interface gráfica** — é o único `.exe` em `dist/`.
 
-### 1. Usando os Atalhos Interativos `.bat`
-*   **[executar_simulacao.bat](executar_simulacao.bat):** Abre um console interativo no modo **Dry Run** (simulação). Você poderá digitar a pasta de origem; a simulação apenas mostrará quais arquivos seriam movidos e seus respectivos destinos sem realizar nenhuma alteração física.
-*   **[executar_real.bat](executar_real.bat):** Abre um console interativo que executa a movimentação **real** dos arquivos do diretório escolhido.
-
-*Nota: Se você pressionar Enter sem digitar nenhum caminho em qualquer um dos scripts, o sistema adotará como padrão o Desktop do usuário (`C:\Users\ANDERSON\Desktop`).*
+### 1. Interface Gráfica
+```bash
+dist\OrganizadorArquivosGUI.exe
+```
+Janela única: informe a pasta, clique em **Analisar** (que nunca move nada),
+revise a tabela `arquivo → título detectado → pasta` e só então use **Mover
+arquivos**, que confirma a quantidade antes de agir. A leitura dos PDFs roda em
+thread separada, com barra de progresso e botão **Cancelar** — a janela continua
+respondendo mesmo com centenas de documentos.
 
 ### 2. Linha de Comando (CLI)
-Você pode rodar diretamente o executável via PowerShell ou Prompt de Comando:
+A CLI não é empacotada: ela roda pelo interpretador, a partir desta pasta.
 ```bash
 # Simular organização no diretório Downloads
-dist\OrganizadorArquivos.exe --path "C:\Users\ANDERSON\Downloads"
+..\.venv\Scripts\python.exe src\organizer.py --path "C:\Users\ANDERSON\Downloads"
+
+# Ver titulo detectado e pasta de destino de cada arquivo, sem mover nada
+..\.venv\Scripts\python.exe src\organizer.py --path "C:\Users\ANDERSON\Downloads" --report
 
 # Executar movimentação real no Desktop
-dist\OrganizadorArquivos.exe --path "C:\Users\ANDERSON\Desktop" --real
+..\.venv\Scripts\python.exe src\organizer.py --path "C:\Users\ANDERSON\Desktop" --real
 ```
+O botão **Analisar** da interface mostra a mesma informação que `--report`, em tabela.
+
+### 3. Estendendo o vocabulário
+Cada entrada de `TERMS` em `src/document_terms.py` declara o termo no singular; o
+nome da pasta é derivado pelas regras de plural do português (`certidão` →
+`Certidões`, `edital` → `Editais`, `DARF` → `DARFs`). Use `--report` para
+descobrir quais títulos dos seus documentos ainda não têm termo.
 
 ---
 
@@ -91,5 +113,5 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pytest advanced-organizer/tests
 ```
 
-São 13 testes (93% de cobertura). Os de `test_regressions.py` tocam o filesystem
+São 88 testes. Os de `test_regressions.py` tocam o filesystem
 real de propósito — cobrem dois bugs de perda de arquivos que mocks não reproduzem.
