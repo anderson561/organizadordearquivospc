@@ -257,13 +257,14 @@ lint, smoke test da CLI em dry run e a lista de executáveis que o build produzi
 | 1.4.0  | 2026-08-21 | Guias de arrecadação separadas por jurisdição (`DAMs`, `DAEs`, `DARFs`). Limpeza do ruído `(cid:N)` de PDFs sem mapa ToUnicode. |
 | 1.4.1  | 2026-08-21 | Empacotamento apenas da interface gráfica; atalhos `.bat` de console removidos. |
 | 1.4.2  | 2026-08-21 | Revisão completa da documentação: instruções de instalação e exemplo de import que não funcionavam, descrições de `CompanyNameStrategy` e `TypeStrategy` divergentes do código, árvore de arquivos incorreta. |
+| 1.4.3  | 2026-08-21 | Repositório renomeado de `moverarquivos` para `organizadordearquivospc`. A pasta local e o nome do produto seguem inalterados. |
 
 ---
 
 ## 📞 Contato
 
 - **Autor**: Anderson 561 (GitHub: `anderson561`)
-- **Contato e issues**: abra tickets em <https://github.com/anderson561/moverarquivos/issues>
+- **Contato e issues**: abra tickets em <https://github.com/anderson561/organizadordearquivospc/issues>
 
 ---
 
