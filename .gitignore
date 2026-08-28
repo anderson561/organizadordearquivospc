@@ -63,4 +63,6 @@ Thumbs.db
 .agent/
 .agents/
 .claude/
+# Copias de seguranca dessas pastas (agent.bkp/, claude.bkp/, ...)
+*.bkp/
 .windsurfrules
