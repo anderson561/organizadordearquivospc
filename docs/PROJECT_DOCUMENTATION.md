@@ -1,10 +1,12 @@
-# MoverArquivos – Documentação Completa
+# Organizador Avançado de Arquivos – Documentação Completa
+
+Versão documentada: **1.5.0**.
 
 ---
 
 ## 📖 Visão Geral
 
-`MoverArquivos` é um utilitário para Windows, escrito em Python, que organiza
+O **Organizador Avançado de Arquivos** é um utilitário para Windows, escrito em Python, que organiza
 arquivos em pastas com base em estratégias de classificação: **título do
 documento**, metadados de nota fiscal e extensão do arquivo. A interface gráfica
 é a forma recomendada de uso; a linha de comando atende automação e diagnóstico.
@@ -88,6 +90,7 @@ rem Sem --path: abre um seletor de pasta
 | `--path`  | Caminho da pasta a ser organizada. Se omitido, abre o seletor de pasta. | `None` |
 | `--real`  | Executa a movimentação real (caso contrário, só simulação). | `False` |
 | `--report`| Lista o título detectado e a pasta de destino de cada arquivo, sem mover nada. | `False` |
+| `--version`| Mostra a versão e sai. | — |
 
 ### Módulo Python
 Como `advanced-organizer` não é um pacote importável, acrescente `src/` ao
@@ -120,14 +123,17 @@ moverarquivos/
 │   │   ├─ organizer.py      # Core da aplicação (classe FileOrganizer)
 │   │   ├─ strategies.py     # Estratégias (Título do documento, Empresa, Tipo)
 │   │   ├─ document_terms.py # Vocabulário de termos e regras de plural
+│   │   ├─ version.py        # Número de versão (fonte única do produto)
 │   │   └─ gui.py            # Interface gráfica (tkinter)
 │   ├─ tests/                # Testes (pytest) e gerador de PDF de fixture
 │   ├─ build.bat             # Empacota a interface gráfica com PyInstaller
+│   ├─ gerar_version_info.py # Propriedades gravadas no .exe (nome, versão)
 │   ├─ dist/                 # Saída do build (OrganizadorArquivosGUI.exe)
 │   └─ README.md             # Documentação interna do módulo
 │
 ├─ docs/                     # Esta documentação
 ├─ reports/                  # Saída de verify_project.py
+├─ CHANGELOG.md              # Histórico de versões
 ├─ requirements.txt          # Dependências de execução (fixadas)
 ├─ requirements-dev.txt      # Testes, lint e empacotamento
 └─ verify_project.py         # Testes + cobertura + lint + smoke test + build
@@ -224,7 +230,7 @@ termo: a lista de "sem termo reconhecido" é exatamente o insumo dessa tarefa.
 
 A partir da raiz do repositório:
 ```bash
-.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 88 testes
+.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 94 testes
 .venv\Scripts\python.exe verify_project.py                    # + cobertura, lint, smoke test e build
 ```
 `verify_project.py` grava `reports/verification_report.md` com testes, cobertura,
@@ -242,22 +248,18 @@ lint, smoke test da CLI em dry run e a lista de executáveis que o build produzi
 3. Escreva testes. Mudança de classificação precisa de teste com PDF de verdade —
    use o gerador em `tests/pdf_fixtures.py`.
 4. Rode `verify_project.py` e garanta testes e lint limpos.
-5. Atualize esta documentação e o changelog abaixo **antes** de subir.
+5. Atualize esta documentação e o [`CHANGELOG.md`](../CHANGELOG.md) na raiz
+   **antes** de subir.
+6. Ao publicar uma versão, altere `src/version.py` — é dele que saem o título
+   da janela, o `--version` e as propriedades do `.exe`.
 
 ---
 
 ## 📄 Changelog
 
-| Versão | Data | Alterações |
-|--------|------|------------|
-| 1.0.0  | 2026-06-01 | Lançamento inicial – organização por tipo, UI de seleção de pasta, modo simulação/real. |
-| 1.1.0  | 2026-06-03 | Integração de `ruff` como linter, relatório de cobertura, script de verificação automatizado. |
-| 1.2.0  | 2026-08-20 | Classificação por título do documento com vocabulário extensível e plural do português. Remoção da `ImpostoStrategy`, que casava `DAS` por substring. Correção de dois bugs de perda de arquivos. |
-| 1.3.0  | 2026-08-20 | Interface gráfica em tkinter: análise em duas etapas, progresso, cancelamento e confirmação antes de mover. |
-| 1.4.0  | 2026-08-21 | Guias de arrecadação separadas por jurisdição (`DAMs`, `DAEs`, `DARFs`). Limpeza do ruído `(cid:N)` de PDFs sem mapa ToUnicode. |
-| 1.4.1  | 2026-08-21 | Empacotamento apenas da interface gráfica; atalhos `.bat` de console removidos. |
-| 1.4.2  | 2026-08-21 | Revisão completa da documentação: instruções de instalação e exemplo de import que não funcionavam, descrições de `CompanyNameStrategy` e `TypeStrategy` divergentes do código, árvore de arquivos incorreta. |
-| 1.4.3  | 2026-08-21 | Repositório renomeado de `moverarquivos` para `organizadordearquivospc`. A pasta local e o nome do produto seguem inalterados. |
+O histórico de versões vive em [`CHANGELOG.md`](../CHANGELOG.md), na raiz do
+repositório. Ele ficava duplicado aqui como tabela; duas listas de versão
+divergem na primeira vez que alguém atualiza só uma.
 
 ---
 
@@ -268,4 +270,4 @@ lint, smoke test da CLI em dry run e a lista de executáveis que o build produzi
 
 ---
 
-*Documentação revisada em 2026-08-21.*
+*Documentação revisada em 2026-09-01, na preparação da versão 1.5.0.*

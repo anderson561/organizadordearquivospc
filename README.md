@@ -1,8 +1,9 @@
-# 📁 MoverArquivos - advanced-organizer
+# 📁 Organizador Avançado de Arquivos
 
+[![Release](https://img.shields.io/badge/release-v1.5.0-blue.svg)](https://github.com/anderson561/organizadordearquivospc/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-88%20passed-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-94%20passed-green.svg)]()
 [![Coverage](https://img.shields.io/badge/coverage-94%25-green.svg)]()
 
 Um sistema resiliente em Python para organização automatizada de diretórios, com interface gráfica. Classifica documentos pelo **título** — lendo o nome do arquivo, os metadados e o cabeçalho do PDF —, faz parsing de metadados de Notas Fiscais eletrônicas e, como reserva, organiza por extensão. Analisar e mover são etapas separadas: nada sai do lugar sem revisão e confirmação.
@@ -23,6 +24,7 @@ O software adota o padrão de projeto **Strategy** para desacoplar e aplicar reg
    * Os três sinais se complementam. Um DARF emitido pela Receita não traz a sigla `DARF` em lugar nenhum do conteúdo (o cabeçalho diz "Documento de Arrecadação"), mas o nome do arquivo quase sempre traz; e quando o nome vem com erro de digitação, o conteúdo cobre.
    * A pasta recebe o termo no **plural**, já que agrupa um ou mais documentos: `DARF` → `DARFs`, `relatório` → `Relatórios`, `nota fiscal` → `Notas Fiscais`.
    * As guias de arrecadação se separam por **jurisdição**: `DAMs` (municipal — ISS, TFF), `DAEs` (estadual — Sefaz) e `DARFs` (federal — Receita). As três começam com a frase "Documento de Arrecadação", então tratá-la como termo único mandava as três para `DARFs`; a frase federal precisa vir completa ("de Receitas Federais").
+   * A guia do Simples Nacional é reconhecida pelo prefixo do programa emissor (`PGDASD-DAS-…`), porque em parte dos PDFs o bloco do CNPJ empurra o cabeçalho para fora da região de título. Os outros papéis do mesmo programa — declaração, extrato e recibo — vão para as próprias pastas.
    * O vocabulário fica em [`src/document_terms.py`](advanced-organizer/src/document_terms.py) e é extensível: acrescente um termo e a pasta é derivada automaticamente pelas regras de plural do português.
    * PDF sem termo reconhecido cai na organização por extensão — o programa prefere não classificar a classificar errado.
 
@@ -62,7 +64,8 @@ moverarquivos/
 │   │   ├── organizer.py         # Orquestrador e motor de movimentação
 │   │   ├── gui.py               # Interface gráfica (tkinter)
 │   │   ├── strategies.py        # Implementações das regras de negócio
-│   │   └── document_terms.py    # Vocabulário de termos e regras de plural
+│   │   ├── document_terms.py    # Vocabulário de termos e regras de plural
+│   │   └── version.py           # Número de versão do produto (fonte única)
 │   ├── tests/
 │   │   ├── test_organizer.py    # Testes do fluxo de organização e conflitos
 │   │   ├── test_strategies.py   # Testes unitários das estratégias
@@ -73,11 +76,13 @@ moverarquivos/
 │   ├── dist/
 │   │   └── OrganizadorArquivosGUI.exe  # Único executável gerado
 │   ├── build.bat                # Empacota a interface gráfica
+│   ├── gerar_version_info.py    # Propriedades gravadas no .exe
 │   └── README.md                # Documentação interna do módulo
 ├── reports/
 │   └── verification_report.md   # Saída de verify_project.py
 ├── requirements.txt             # Dependências de execução (fixadas)
 ├── requirements-dev.txt         # Testes, lint e empacotamento
+├── CHANGELOG.md                 # Histórico de versões
 ├── verify_project.py            # Testes + cobertura + lint + smoke test
 └── README.md                    # Este arquivo (Portal do projeto)
 ```
@@ -89,6 +94,13 @@ moverarquivos/
 O empacotamento gera **um único executável**: a interface gráfica. A linha de comando continua existindo, rodada pelo interpretador.
 
 ### Interface Gráfica (recomendado)
+
+Baixe `OrganizadorArquivosGUI.exe` na [página de releases](https://github.com/anderson561/organizadordearquivospc/releases/latest) e clique duas vezes. Não precisa instalar Python nem nada mais.
+
+> O executável não tem assinatura digital, então o Windows mostra o aviso do SmartScreen na primeira execução: **Mais informações → Executar assim mesmo**. Antes disso vale conferir, em **Propriedades → Detalhes**, se o produto é *Organizador Avancado de Arquivos* na versão esperada.
+
+Quem tem o repositório clonado e roda `build.bat` encontra o mesmo arquivo em:
+
 ```bash
 advanced-organizer/dist/OrganizadorArquivosGUI.exe
 ```
@@ -122,7 +134,7 @@ novos valem entrar no vocabulário.
 
 ## 🧪 Testes Automatizados
 
-O repositório possui **88 testes**, cobrindo simulação, tratamento de duplicidades,
+O repositório possui **94 testes**, cobrindo simulação, tratamento de duplicidades,
 resolução de conflitos, pluralização em português, extração de título e
 classificação de PDFs de verdade (gerados em tempo de teste).
 

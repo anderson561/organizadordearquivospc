@@ -17,6 +17,7 @@ from collections import Counter
 from tkinter import filedialog, messagebox, ttk
 
 from organizer import FileOrganizer
+from version import __version__
 
 POLL_MS = 100          # intervalo de drenagem da fila de eventos
 SYSTEM_DIRS = ("windows", "program files", "program files (x86)", "system32")
@@ -32,7 +33,7 @@ class OrganizerApp:
         self.worker = None
         self.plans = []
 
-        root.title("Organizador Avançado de Arquivos")
+        root.title(f"Organizador Avançado de Arquivos v{__version__}")
         root.minsize(880, 520)
         self._build_widgets()
         self._set_state("inicial")

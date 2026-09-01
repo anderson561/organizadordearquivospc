@@ -1,5 +1,5 @@
 # verify_project.py
-"""Automated verification script for the MoverArquivos project.
+"""Automated verification script for the Organizador Avancado de Arquivos project.
 
 Features:
 - Run unit tests with coverage (coverage report generated).
@@ -19,6 +19,12 @@ BASE_DIR = Path(__file__).resolve().parent  # project root (c:/python/moverarqui
 ADV_ORG = BASE_DIR / "advanced-organizer"
 REPORTS_DIR = BASE_DIR / "reports"
 REPORT_FILE = REPORTS_DIR / "verification_report.md"
+
+# A versao do produto vem de src/version.py: o relatorio precisa dizer qual
+# build ele verificou, senao nao serve para conferir um .exe ja publicado.
+sys.path.insert(0, str(ADV_ORG / "src"))
+from version import __version__ as PRODUCT_VERSION  # noqa: E402
+
 
 def run_cmd(command, cwd=None, shell=False):
     """Run a shell command, capture output, and return (returncode, stdout, stderr).
@@ -45,7 +51,7 @@ def write_section(title: str, content: str):
 def main():
     os.makedirs(REPORTS_DIR, exist_ok=True)
     # Clear previous report
-    REPORT_FILE.write_text("# MoverArquivos Verification Report\n\nGenerated on " + __import__("datetime").datetime.now().isoformat() + "\n\n", encoding="utf-8")
+    REPORT_FILE.write_text(f"# Organizador Avancado de Arquivos {PRODUCT_VERSION} - Verification Report\n\nGenerated on " + __import__("datetime").datetime.now().isoformat() + "\n\n", encoding="utf-8")
 
     # 1. Run tests with coverage
     print("Running tests with coverage...")
@@ -116,6 +122,7 @@ def main():
         write_section(
             "Build Script Output",
             f"exit code: {rc_build}\n"
+            f"version packaged: {PRODUCT_VERSION}\n"
             f"OrganizadorArquivosGUI.exe present: {gui_exe.is_file()}\n"
             f"executables in dist/: {produced}\n\n" + out_build + "\n" + err_build,
         )

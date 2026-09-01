@@ -1,4 +1,4 @@
-# Dependencias de execucao do MoverArquivos.
+# Dependencias de execucao do Organizador Avancado de Arquivos.
 # Versoes fixadas para garantir builds reproduziveis.
 pdfminer.six==20251230
 tenacity==9.1.4

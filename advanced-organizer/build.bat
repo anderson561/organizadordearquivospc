@@ -7,8 +7,15 @@ if exist "..\.venv\Scripts\python.exe" set PY=..\.venv\Scripts\python.exe
 echo Usando interpretador: %PY%
 echo.
 
+REM Propriedades do arquivo (nome, versao, copyright), derivadas de
+REM src\version.py. Sem isto o .exe sai com os campos em branco em
+REM Propriedades > Detalhes.
+echo Gerando as propriedades do executavel...
+"%PY%" gerar_version_info.py
+echo.
+
 echo Gerando o executavel da INTERFACE GRAFICA...
-"%PY%" -m PyInstaller --noconfirm --onefile --windowed --name "OrganizadorArquivosGUI" src\gui.py
+"%PY%" -m PyInstaller --noconfirm --onefile --windowed --name "OrganizadorArquivosGUI" --version-file build\version_info.txt src\gui.py
 echo.
 echo Build concluido! O executavel esta na pasta 'dist':
 echo   OrganizadorArquivosGUI.exe  - clique duplo para abrir a janela

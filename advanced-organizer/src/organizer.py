@@ -4,6 +4,7 @@ import logging
 from typing import Dict, Iterable, List, NamedTuple, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential
 from strategies import BaseStrategy, DocumentTitleStrategy, CompanyNameStrategy
+from version import __version__
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -259,6 +260,7 @@ if __name__ == "__main__":
     from tkinter import filedialog
 
     parser = argparse.ArgumentParser(description="Organizador Avançado de Arquivos")
+    parser.add_argument("--version", action="version", version=f"Organizador Avançado de Arquivos {__version__}")
     parser.add_argument("--path", type=str, default=None, help="Caminho da pasta a ser organizada")
     parser.add_argument("--real", action="store_true", help="Executa a movimentação real dos arquivos (caso contrário, apenas simula)")
     parser.add_argument("--report", action="store_true", help="Apenas lista o título detectado e a pasta de destino de cada arquivo, sem mover nada")
