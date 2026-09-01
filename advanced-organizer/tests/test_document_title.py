@@ -436,5 +436,59 @@ class TestOrganizerIntegration(unittest.TestCase):
         self.assertFalse(por_nome["sem_termo.pdf"].recognized)
 
 
+class TestGuiaDoSimplesPeloPGDASD(unittest.TestCase):
+    """A guia do Simples nem sempre mostra o cabecalho na janela de titulo.
+
+    O PGDASD gera quatro papeis diferentes com o mesmo prefixo de nome: a
+    guia (DAS), a declaracao, o extrato e o recibo de entrega. Em parte dos
+    PDFs da guia o bloco do CNPJ vem antes do cabecalho e empurra a frase
+    "Documento de Arrecadacao do Simples Nacional" para fora das cinco
+    primeiras linhas, entao a corroboracao exigida pelo acronimo "DAS" nunca
+    chega e a guia caia na organizacao por extensao.
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        self.strategy = DocumentTitleStrategy()
+
+    def _pdf(self, name, lines, title=None):
+        return build_pdf(os.path.join(self.dir, name), lines, title=title)
+
+    def test_guia_sem_o_cabecalho_na_janela_de_titulo(self):
+        """O caso que falhava: o CNPJ empurra o cabecalho para fora."""
+        p = self._pdf("PGDASD-DAS-20547819202511001.pdf",
+                      ["CNPJ", "20.547.819/0001-80 BOTECO 27 BAR E RESTAURANTE LTDA.",
+                       "Razão Social", "Período de Apuração", "Data de Vencimento"])
+        self.assertEqual(self.strategy.get_destination_subpath(p), "DASs")
+
+    def test_guia_com_o_cabecalho_visivel_continua_em_dass(self):
+        p = self._pdf("PGDASD-DAS-60225957000168.pdf",
+                      ["Documento de Arrecadação", "do Simples Nacional",
+                       "CNPJ", "60.225.957/0001-68"])
+        self.assertEqual(self.strategy.get_destination_subpath(p), "DASs")
+
+    def test_declaracao_do_mesmo_programa_nao_vira_guia(self):
+        """O prefixo PGDASD sozinho nao decide: o segmento seguinte decide."""
+        p = self._pdf("PGDASD-DECLARACAO-60225957202511002.pdf",
+                      ["Declaração Anual", "Simples Nacional"])
+        self.assertEqual(self.strategy.get_destination_subpath(p), "Declarações")
+
+    def test_extrato_do_mesmo_programa_nao_vira_guia(self):
+        p = self._pdf("PGDASD-EXTRATO-60225957202511002.pdf",
+                      ["Extrato da Apuração", "Simples Nacional"])
+        self.assertEqual(self.strategy.get_destination_subpath(p), "Extratos")
+
+    def test_nome_em_caixa_baixa_tambem_reconhece(self):
+        """Nome de arquivo renomeado a mao chega minusculo."""
+        p = self._pdf("pgdasd-das-60225957000168.pdf", ["CNPJ", "60.225.957/0001-68"])
+        self.assertEqual(self.strategy.get_destination_subpath(p), "DASs")
+
+    def test_a_preposicao_das_nao_ativa_a_guia(self):
+        """A protecao contra o homografo continua valendo."""
+        p = self._pdf("relatorio.pdf", ["Relatório das vendas do mês"])
+        self.assertEqual(self.strategy.get_destination_subpath(p), "Relatórios")
+
+
 if __name__ == '__main__':
     unittest.main()

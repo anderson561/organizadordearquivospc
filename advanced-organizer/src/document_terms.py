@@ -142,6 +142,16 @@ TERMS: Tuple[Term, ...] = (
     Term("IPTU", acronym=True),
     Term("IPVA", acronym=True),
     Term("GRERJ", acronym=True),
+    # A guia do Simples sai do PGDASD (Programa Gerador do Documento de
+    # Arrecadacao do Simples Nacional Declaratorio). Em varios PDFs o bloco
+    # do CNPJ vem antes do cabecalho e empurra a frase 'Documento de
+    # Arrecadacao do Simples Nacional' para fora da janela de cinco linhas,
+    # entao a corroboracao exigida por 'DAS' nunca chega. O nome do arquivo,
+    # porem, sempre traz o prefixo do emissor: PGDASD-DAS-<cnpj><periodo>.
+    # Vem antes de 'DAS' e dos termos genericos para nao perder a guia para
+    # 'declaracao' ou 'extrato' - o mesmo programa gera esses outros papeis,
+    # e so o segmento depois de PGDASD separa um do outro.
+    Term("PGDASD DAS", acronym=True, folder="DASs"),
     # "DAS" e homografo da preposicao "das": exige corroboracao explicita.
     Term("DAS", acronym=True, requires=("SIMPLES NACIONAL", "ARRECADACAO DO SIMPLES")),
 
