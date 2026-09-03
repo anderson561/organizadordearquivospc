@@ -21,7 +21,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 's
 sys.path.append(os.path.dirname(__file__))
 
 from pdf_fixtures import build_pdf
-from organizer import FileOrganizer, FilePlan, Summary
+from organizer import FileOrganizer, FilePlan, Summary, ORGANIZED_ROOT_NAME
 
 
 def _criar_root():
@@ -106,8 +106,9 @@ class TestCamadaDeDados(unittest.TestCase):
         self.assertIsInstance(summary, Summary)
         self.assertEqual(summary.movidos, 3)
         self.assertEqual(summary.falhas, 0)
-        self.assertEqual(os.listdir(os.path.join(self.base, "DARFs")), ["guia darf.pdf"])
-        self.assertEqual(os.listdir(os.path.join(self.base, "Relatórios")), ["rel.pdf"])
+        raiz = os.path.join(self.base, ORGANIZED_ROOT_NAME)
+        self.assertEqual(os.listdir(os.path.join(raiz, "DARFs")), ["guia darf.pdf"])
+        self.assertEqual(os.listdir(os.path.join(raiz, "Relatórios")), ["rel.pdf"])
 
     def test_apply_plans_em_dry_run_nao_move(self):
         plans = self._organizer().classify_all()
@@ -213,8 +214,9 @@ class TestJanela(unittest.TestCase):
             self.app._start_move()
             self._drain(lambda: self.app.state == "movendo")
 
-        self.assertEqual(os.listdir(os.path.join(base, "DARFs")), ["guia darf.pdf"])
-        self.assertEqual(os.listdir(os.path.join(base, "Relatórios")), ["rel.pdf"])
+        raiz = os.path.join(base, ORGANIZED_ROOT_NAME)
+        self.assertEqual(os.listdir(os.path.join(raiz, "DARFs")), ["guia darf.pdf"])
+        self.assertEqual(os.listdir(os.path.join(raiz, "Relatórios")), ["rel.pdf"])
         self.assertIn("2 arquivo(s) movido(s)", self.app.summary_var.get())
 
     def _drain(self, still_running, timeout=60):

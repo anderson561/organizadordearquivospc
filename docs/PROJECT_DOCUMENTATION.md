@@ -1,6 +1,6 @@
 # Organizador Avançado de Arquivos – Documentação Completa
 
-Versão documentada: **1.5.0**.
+Versão documentada: **1.6.0**.
 
 ---
 
@@ -202,6 +202,26 @@ class BaseStrategy:
 A varredura **não é recursiva**: só os arquivos diretamente dentro dessas pastas
 são considerados.
 
+### Pasta guarda-chuva (`ORGANIZED_ROOT_NAME`)
+`apply_plans` não move o arquivo direto para `<pasta esconeada>/<categoria>/`;
+insere `Arquivos Organizados` entre os dois: `<pasta escaneada>/Arquivos
+Organizados/<categoria>/`. Isso é o que separa, na pasta de origem, o que o
+programa criou do que já estava lá — em vez de uma dezena de pastas novas
+(`DARFs`, `Notas Fiscais`, `JPG`...) nascendo soltas ao lado de tudo que já
+existia, nasce uma única pasta nova.
+
+`FilePlan.folder` continua guardando só o nome da categoria (`"DARFs"`), sem o
+guarda-chuva — é ele que a tabela da interface e o `--report` mostram. O
+guarda-chuva é inserido só no momento de montar o caminho físico de destino,
+dentro de `apply_plans`. Como a raiz escaneada é lida com `os.listdir`, não
+recursivo, o conteúdo de `Arquivos Organizados` nunca é reprocessado numa
+segunda execução.
+
+**Não migra pastas de execuções anteriores.** Categorias já criadas direto na
+raiz por uma versão anterior (por exemplo `Downloads/DARFs`) continuam onde
+estão; só o que for movido a partir desta versão passa a nascer dentro do
+guarda-chuva. Consolidar o que já existe é decisão manual do usuário.
+
 ---
 
 ## 🔤 Estendendo o vocabulário
@@ -270,4 +290,4 @@ divergem na primeira vez que alguém atualiza só uma.
 
 ---
 
-*Documentação revisada em 2026-09-01, na preparação da versão 1.5.0.*
+*Documentação revisada em 2026-09-03, na preparação da versão 1.6.0.*

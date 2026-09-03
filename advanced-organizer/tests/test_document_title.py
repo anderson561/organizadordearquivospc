@@ -17,7 +17,7 @@ from pdf_fixtures import build_pdf
 from document_terms import folder_case, match_term, normalize_for_match, pluralize_pt
 from strategies import (DocumentTitleStrategy, TitleRegion, _clean_line,
                         _looks_like_title, extract_title_region, filename_hint)
-from organizer import FileOrganizer
+from organizer import FileOrganizer, ORGANIZED_ROOT_NAME
 
 
 class TestPluralizePt(unittest.TestCase):
@@ -387,10 +387,11 @@ class TestOrganizerIntegration(unittest.TestCase):
 
         FileOrganizer(base_path=self.base, dry_run=False).organize()
 
-        self.assertEqual(sorted(os.listdir(os.path.join(self.base, "DARFs"))),
+        raiz = os.path.join(self.base, ORGANIZED_ROOT_NAME)
+        self.assertEqual(sorted(os.listdir(os.path.join(raiz, "DARFs"))),
                          ["d1.pdf", "d2.pdf"])
-        self.assertEqual(os.listdir(os.path.join(self.base, "Relatórios")), ["r1.pdf"])
-        self.assertEqual(os.listdir(os.path.join(self.base, "JPG")), ["foto.jpg"])
+        self.assertEqual(os.listdir(os.path.join(raiz, "Relatórios")), ["r1.pdf"])
+        self.assertEqual(os.listdir(os.path.join(raiz, "JPG")), ["foto.jpg"])
 
     def test_pasta_contem_somente_os_arquivos_daquele_termo(self):
         build_pdf(os.path.join(self.base, "a.pdf"), ["DARF"])
@@ -399,9 +400,10 @@ class TestOrganizerIntegration(unittest.TestCase):
 
         FileOrganizer(base_path=self.base, dry_run=False).organize()
 
-        self.assertEqual(os.listdir(os.path.join(self.base, "DARFs")), ["a.pdf"])
-        self.assertEqual(os.listdir(os.path.join(self.base, "Relatórios")), ["b.pdf"])
-        self.assertEqual(os.listdir(os.path.join(self.base, "Notas Fiscais")), ["c.pdf"])
+        raiz = os.path.join(self.base, ORGANIZED_ROOT_NAME)
+        self.assertEqual(os.listdir(os.path.join(raiz, "DARFs")), ["a.pdf"])
+        self.assertEqual(os.listdir(os.path.join(raiz, "Relatórios")), ["b.pdf"])
+        self.assertEqual(os.listdir(os.path.join(raiz, "Notas Fiscais")), ["c.pdf"])
 
     def test_muitos_arquivos_na_mesma_pasta_nenhum_sobrescrito(self):
         """Consolidar por termo aumenta a colisao de nomes: nada pode se perder."""
@@ -412,7 +414,7 @@ class TestOrganizerIntegration(unittest.TestCase):
             os.utime(os.path.join(self.base, "guia.pdf"), (1700000000, 1700000000))
             FileOrganizer(base_path=self.base, dry_run=False).organize()
 
-        destino = os.path.join(self.base, "DARFs")
+        destino = os.path.join(self.base, ORGANIZED_ROOT_NAME, "DARFs")
         salvos = [open(os.path.join(destino, n), "rb").read() for n in os.listdir(destino)]
         self.assertEqual(len(salvos), 6, "algum arquivo foi sobrescrito")
         self.assertEqual(sorted(salvos), sorted(conteudos))

@@ -1,6 +1,6 @@
 # 📁 Organizador Avançado de Arquivos
 
-[![Release](https://img.shields.io/badge/release-v1.5.0-blue.svg)](https://github.com/anderson561/organizadordearquivospc/releases/latest)
+[![Release](https://img.shields.io/badge/release-v1.6.0-blue.svg)](https://github.com/anderson561/organizadordearquivospc/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-94%20passed-green.svg)]()
@@ -112,6 +112,11 @@ pede confirmação declarando quantos arquivos serão movidos.
 O fluxo é de duas etapas de propósito: analisar **nunca** move nada. Isso torna
 impossível o mal-entendido de rodar a ferramenta, ver texto passando na tela e
 não perceber que nada aconteceu.
+
+Todo arquivo reconhecido vai para dentro de uma única pasta guarda-chuva,
+**`Arquivos Organizados`**, criada na raiz da pasta escolhida — e as categorias
+(`DARFs`, `Notas Fiscais`, `JPG`...) nascem dentro dela, não soltas na raiz junto
+com o que já estava lá.
 
 ### Linha de Comando (pelo interpretador)
 ```bash

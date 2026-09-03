@@ -46,7 +46,7 @@ class TestFileOrganizer(unittest.TestCase):
         with patch('organizer.logger') as mock_logger:
             organizer.organize()
             # Deve indicar dry run para o arquivo .txt
-            mock_logger.info.assert_any_call("[DRY RUN] Moveria: C:\\dummy_path\\file1.txt -> C:\\dummy_path\\TEXT_FILES\\file1.txt")
+            mock_logger.info.assert_any_call("[DRY RUN] Moveria: C:\\dummy_path\\file1.txt -> C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES\\file1.txt")
             # file2.jpg não deve ser movido pois get_destination_subpath retorna None
 
     @patch('os.path.exists')
@@ -75,8 +75,8 @@ class TestFileOrganizer(unittest.TestCase):
 
         organizer.organize()
         
-        mock_makedirs.assert_called_once_with("C:\\dummy_path\\TEXT_FILES", exist_ok=True)
-        mock_move.assert_called_once_with("C:\\dummy_path\\file1.txt", "C:\\dummy_path\\TEXT_FILES\\file1.txt")
+        mock_makedirs.assert_called_once_with("C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES", exist_ok=True)
+        mock_move.assert_called_once_with("C:\\dummy_path\\file1.txt", "C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES\\file1.txt")
 
     @patch('os.path.exists')
     @patch('os.listdir')
@@ -87,12 +87,12 @@ class TestFileOrganizer(unittest.TestCase):
     def test_organize_real_move_with_duplicate(self, mock_move, mock_getmtime, mock_makedirs, mock_isfile, mock_listdir, mock_exists):
         # Ambos existem (raiz e arquivo de destino já existente)
         def exists_side_effect(path):
-            if path in ("C:\\dummy_path", "C:\\dummy_path\\TEXT_FILES\\file1.txt"):
+            if path in ("C:\\dummy_path", "C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES\\file1.txt"):
                 return True
             return False
             
         def isfile_side_effect(path):
-            if path in ("C:\\dummy_path\\file1.txt", "C:\\dummy_path\\TEXT_FILES\\file1.txt"):
+            if path in ("C:\\dummy_path\\file1.txt", "C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES\\file1.txt"):
                 return True
             return False
 
@@ -107,7 +107,7 @@ class TestFileOrganizer(unittest.TestCase):
         organizer.organize()
         
         # Como o destino já existe, deve renomear usando o mtime
-        expected_dest = "C:\\dummy_path\\TEXT_FILES\\file1_123456789.txt"
+        expected_dest = "C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES\\file1_123456789.txt"
         mock_move.assert_called_once_with("C:\\dummy_path\\file1.txt", expected_dest)
 
     @patch('os.path.exists')
@@ -125,14 +125,14 @@ class TestFileOrganizer(unittest.TestCase):
         def exists_side_effect(path):
             if path == "C:\\dummy_path":
                 return True
-            if path == "C:\\dummy_path\\TEXT_FILES":
+            if path == "C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES":
                 return True # Diz que existe
             return False
             
         def isfile_side_effect(path):
             if path == "C:\\dummy_path\\file1.txt":
                 return True
-            if path == "C:\\dummy_path\\TEXT_FILES":
+            if path == "C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES":
                 return True # É um arquivo!
             return False
 
@@ -146,10 +146,10 @@ class TestFileOrganizer(unittest.TestCase):
         organizer.organize()
 
         # Deve ter renomeado a pasta/arquivo conflitante
-        mock_rename.assert_called_once_with("C:\\dummy_path\\TEXT_FILES", "C:\\dummy_path\\TEXT_FILES_CONFLITO_F_P")
+        mock_rename.assert_called_once_with("C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES", "C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES_CONFLITO_F_P")
         # E depois prosseguido com a criação e movimentação
-        mock_makedirs.assert_called_once_with("C:\\dummy_path\\TEXT_FILES", exist_ok=True)
-        mock_move.assert_called_once_with("C:\\dummy_path\\file1.txt", "C:\\dummy_path\\TEXT_FILES\\file1.txt")
+        mock_makedirs.assert_called_once_with("C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES", exist_ok=True)
+        mock_move.assert_called_once_with("C:\\dummy_path\\file1.txt", "C:\\dummy_path\\Arquivos Organizados\\TEXT_FILES\\file1.txt")
 
     def test_custom_base_path(self):
         custom_path = r"C:\custom_test_dir"

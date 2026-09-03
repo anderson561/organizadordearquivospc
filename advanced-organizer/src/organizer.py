@@ -11,6 +11,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+# Todo arquivo reconhecido vai para dentro desta pasta unica, e nao direto
+# na raiz escolhida. Antes cada categoria (DARFs, Notas Fiscais, JPG...)
+# nascia solta ali, misturada com o que ja existia na pasta - em Downloads,
+# uma dezena de pastas novas ao lado de tudo que ja estava la. Com a pasta
+# guarda-chuva, a raiz ganha uma unica entrada nova.
+ORGANIZED_ROOT_NAME = "Arquivos Organizados"
+
+
 class FilePlan(NamedTuple):
     """O destino decidido para um arquivo, antes de qualquer movimentação."""
     name: str
@@ -181,7 +189,7 @@ class FileOrganizer:
 
             if plan.folder:
                 root_path = os.path.dirname(plan.path)
-                dest_path = os.path.join(root_path, plan.folder, plan.name)
+                dest_path = os.path.join(root_path, ORGANIZED_ROOT_NAME, plan.folder, plan.name)
 
                 # Evita mover para dentro de si mesmo se já estiver na pasta certa
                 if os.path.abspath(plan.path) != os.path.abspath(dest_path):
@@ -206,6 +214,7 @@ class FileOrganizer:
 
         width = max((len(p.name) for p in plans), default=8)
         print(f"\nClassificacao de {len(plans)} arquivo(s) em {self.base_path}\n")
+        print(f"Os reconhecidos vao para dentro de {ORGANIZED_ROOT_NAME!r}, na subpasta indicada em PASTA.\n")
         print(f"{'ARQUIVO'.ljust(width)}  {'TITULO DETECTADO'.ljust(40)}  PASTA")
         print(f"{'-' * width}  {'-' * 40}  {'-' * 20}")
         for plan in plans:

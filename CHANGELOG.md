@@ -10,6 +10,22 @@ primeira publicada como release, com executável anexado.
 
 ---
 
+## [1.6.0] - 2026-09-03
+
+### Adicionado
+
+- **Pasta guarda-chuva `Arquivos Organizados`.** Ao mover, cada categoria
+  (`DARFs`, `Notas Fiscais`, `JPG`...) passa a nascer dentro de uma única pasta
+  nova na raiz escolhida, em vez de solta ali junto com o que já existia. Numa
+  pasta como a Downloads do usuário, isso troca uma dezena de pastas novas por
+  uma só.
+- A confirmação da interface gráfica, antes de mover, agora mostra o caminho
+  real de destino (com o guarda-chuva incluído), não só a raiz escolhida.
+
+Não migra pastas de execuções anteriores: categorias já criadas direto na raiz
+por uma versão anterior continuam onde estão. Só o que for movido a partir
+desta versão nasce dentro do guarda-chuva.
+
 ## [1.5.0] - 2026-09-01 — primeiro release público
 
 ### Adicionado
@@ -86,4 +102,5 @@ primeira publicada como release, com executável anexado.
 - Lançamento inicial: organização por tipo, seleção de pasta pela interface e
   modo simulação/real.
 
+[1.6.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.6.0
 [1.5.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.5.0

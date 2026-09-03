@@ -16,7 +16,7 @@ import tkinter as tk
 from collections import Counter
 from tkinter import filedialog, messagebox, ttk
 
-from organizer import FileOrganizer
+from organizer import FileOrganizer, ORGANIZED_ROOT_NAME
 from version import __version__
 
 POLL_MS = 100          # intervalo de drenagem da fila de eventos
@@ -160,10 +160,11 @@ class OrganizerApp:
             return
 
         destinos = len({p.folder for p in movimentaveis})
+        pasta_raiz = os.path.join(caminho, ORGANIZED_ROOT_NAME)
         if not messagebox.askyesno(
             "Confirmar movimentação",
             f"{len(movimentaveis)} arquivo(s) serão movidos para {destinos} pasta(s) "
-            f"dentro de:\n{caminho}\n\nEsta ação move os arquivos de verdade. Continuar?",
+            f"dentro de:\n{pasta_raiz}\n\nEsta ação move os arquivos de verdade. Continuar?",
         ):
             return
 

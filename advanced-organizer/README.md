@@ -15,6 +15,7 @@ Uma solução em Python desenvolvida sob princípios SOLID para a organização 
     *   Evita sobrescrever arquivos usando sufixo de timestamp baseado na data de modificação (`mtime`), com contador incremental caso esse nome também já esteja ocupado. O destino é reconferido antes do move: se ainda estiver em uso, a movimentação é abortada em vez de sobrescrever.
     *   Caso haja um arquivo com o mesmo nome de uma pasta de destino a ser criada, o arquivo conflitante é automaticamente renomeado com a tag `_CONFLITO_F_P` (mais um contador, se necessário) para permitir a criação do diretório.
 *   **Interface Gráfica:** Janela única para informar a pasta, analisar sem mover nada, revisar a tabela e confirmar a movimentação. A linha de comando continua disponível pelo interpretador, com `--report`, `--real` e seletor de pasta.
+*   **Pasta guarda-chuva (`ORGANIZED_ROOT_NAME`):** todo arquivo reconhecido vai para dentro de `Arquivos Organizados`, criada na raiz da pasta escolhida — as categorias (`DARFs`, `JPG`...) nascem dentro dela, e não soltas na raiz junto com o que já estava lá antes.
 
 ---
 

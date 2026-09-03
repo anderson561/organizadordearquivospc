@@ -12,7 +12,7 @@ import shutil
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from organizer import FileOrganizer
+from organizer import FileOrganizer, ORGANIZED_ROOT_NAME
 
 
 class TestNoDataLoss(unittest.TestCase):
@@ -38,7 +38,7 @@ class TestNoDataLoss(unittest.TestCase):
             self._drop_file(versao, mtime)
             FileOrganizer(base_path=self.base, dry_run=False).organize()
 
-        destino = os.path.join(self.base, "TXT")
+        destino = os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT")
         encontrados = {
             open(os.path.join(destino, nome), encoding="utf-8").read()
             for nome in os.listdir(destino)
@@ -47,8 +47,8 @@ class TestNoDataLoss(unittest.TestCase):
         self.assertEqual(encontrados, esperados, "arquivo sobrescrito silenciosamente")
 
     def test_nunca_sobrescreve_destino_existente(self):
-        os.makedirs(os.path.join(self.base, "TXT"))
-        preexistente = os.path.join(self.base, "TXT", "unico.txt")
+        os.makedirs(os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT"))
+        preexistente = os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT", "unico.txt")
         with open(preexistente, "w", encoding="utf-8") as handle:
             handle.write("CONTEUDO-ORIGINAL")
         os.utime(preexistente, (1700000000, 1700000000))
@@ -77,11 +77,13 @@ class TestConflictResolutionIsIdempotent(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.base, ignore_errors=True)
 
     def test_quarentena_ja_ocupada_nao_impede_a_organizacao(self):
+        # A pasta de destino agora vive dentro do guarda-chuva.
+        os.makedirs(os.path.join(self.base, ORGANIZED_ROOT_NAME))
         # 'TXT' e um arquivo bloqueando a pasta de destino...
-        with open(os.path.join(self.base, "TXT"), "w", encoding="utf-8") as handle:
+        with open(os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT"), "w", encoding="utf-8") as handle:
             handle.write("bloqueador")
         # ...e o nome de quarentena padrao ja esta ocupado.
-        with open(os.path.join(self.base, "TXT_CONFLITO_F_P"), "w", encoding="utf-8") as handle:
+        with open(os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT_CONFLITO_F_P"), "w", encoding="utf-8") as handle:
             handle.write("conflito anterior")
 
         alvo = os.path.join(self.base, "doc.txt")
@@ -92,11 +94,11 @@ class TestConflictResolutionIsIdempotent(unittest.TestCase):
 
         self.assertFalse(os.path.exists(alvo), "doc.txt ficou preso na raiz")
         self.assertTrue(
-            os.path.isdir(os.path.join(self.base, "TXT")),
+            os.path.isdir(os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT")),
             "a pasta de destino nao foi criada",
         )
         self.assertEqual(
-            open(os.path.join(self.base, "TXT", "doc.txt"), encoding="utf-8").read(),
+            open(os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT", "doc.txt"), encoding="utf-8").read(),
             "meu documento",
         )
 
