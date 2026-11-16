@@ -188,8 +188,11 @@ class FileOrganizer:
                 break
 
             if plan.folder:
-                root_path = os.path.dirname(plan.path)
-                dest_path = os.path.join(root_path, ORGANIZED_ROOT_NAME, plan.folder, plan.name)
+                # Destino ancorado na pasta ESCOLHIDA, nao na pasta do arquivo:
+                # arquivos de <base>/Notas e <base>/Impostos tambem vao para o
+                # unico <base>/Arquivos Organizados, em vez de criar um segundo
+                # guarda-chuva dentro de cada subpasta.
+                dest_path = os.path.join(self.base_path, ORGANIZED_ROOT_NAME, plan.folder, plan.name)
 
                 # Evita mover para dentro de si mesmo se já estiver na pasta certa
                 if os.path.abspath(plan.path) != os.path.abspath(dest_path):

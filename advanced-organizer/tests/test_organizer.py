@@ -22,7 +22,7 @@ class TestFileOrganizer(unittest.TestCase):
         # Configura exists para retornar False
         mock_exists.return_value = False
         
-        organizer = FileOrganizer(dry_run=True)
+        organizer = FileOrganizer(base_path="C:\\dummy_path", dry_run=True)
         # Limita os caminhos testados para simplificar
         organizer.paths_and_strategies = {"C:\\dummy_path": DummyStrategy()}
         
@@ -40,7 +40,7 @@ class TestFileOrganizer(unittest.TestCase):
         # isfile retorna True para os caminhos construídos
         mock_isfile.side_effect = lambda path: True
 
-        organizer = FileOrganizer(dry_run=True)
+        organizer = FileOrganizer(base_path="C:\\dummy_path", dry_run=True)
         organizer.paths_and_strategies = {"C:\\dummy_path": DummyStrategy()}
 
         with patch('organizer.logger') as mock_logger:
@@ -70,7 +70,7 @@ class TestFileOrganizer(unittest.TestCase):
         mock_listdir.return_value = ["file1.txt"]
         mock_isfile.side_effect = isfile_side_effect
 
-        organizer = FileOrganizer(dry_run=False)
+        organizer = FileOrganizer(base_path="C:\\dummy_path", dry_run=False)
         organizer.paths_and_strategies = {"C:\\dummy_path": DummyStrategy()}
 
         organizer.organize()
@@ -101,7 +101,7 @@ class TestFileOrganizer(unittest.TestCase):
         mock_isfile.side_effect = isfile_side_effect
         mock_getmtime.return_value = 123456789
 
-        organizer = FileOrganizer(dry_run=False)
+        organizer = FileOrganizer(base_path="C:\\dummy_path", dry_run=False)
         organizer.paths_and_strategies = {"C:\\dummy_path": DummyStrategy()}
 
         organizer.organize()
@@ -140,7 +140,7 @@ class TestFileOrganizer(unittest.TestCase):
         mock_listdir.return_value = ["file1.txt"]
         mock_isfile.side_effect = isfile_side_effect
 
-        organizer = FileOrganizer(dry_run=False)
+        organizer = FileOrganizer(base_path="C:\\dummy_path", dry_run=False)
         organizer.paths_and_strategies = {"C:\\dummy_path": DummyStrategy()}
 
         organizer.organize()

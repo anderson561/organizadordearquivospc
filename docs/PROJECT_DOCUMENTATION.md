@@ -203,9 +203,11 @@ A varredura **não é recursiva**: só os arquivos diretamente dentro dessas pas
 são considerados.
 
 ### Pasta guarda-chuva (`ORGANIZED_ROOT_NAME`)
-`apply_plans` não move o arquivo direto para `<pasta esconeada>/<categoria>/`;
-insere `Arquivos Organizados` entre os dois: `<pasta escaneada>/Arquivos
-Organizados/<categoria>/`. Isso é o que separa, na pasta de origem, o que o
+`apply_plans` não move o arquivo direto para `<base>/<categoria>/`; insere
+`Arquivos Organizados` entre os dois: `<base>/Arquivos Organizados/<categoria>/`.
+O destino é sempre ancorado na **pasta escolhida** (`<base>`), mesmo para
+arquivos lidos de `<base>/Notas` ou `<base>/Impostos` — existe um único
+guarda-chuva, na raiz. Isso é o que separa, na pasta escolhida, o que o
 programa criou do que já estava lá — em vez de uma dezena de pastas novas
 (`DARFs`, `Notas Fiscais`, `JPG`...) nascendo soltas ao lado de tudo que já
 existia, nasce uma única pasta nova.
@@ -250,7 +252,7 @@ termo: a lista de "sem termo reconhecido" é exatamente o insumo dessa tarefa.
 
 A partir da raiz do repositório:
 ```bash
-.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 94 testes
+.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 95 testes
 .venv\Scripts\python.exe verify_project.py                    # + cobertura, lint, smoke test e build
 ```
 `verify_project.py` grava `reports/verification_report.md` com testes, cobertura,

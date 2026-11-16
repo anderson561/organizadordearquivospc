@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/badge/release-v1.6.0-blue.svg)](https://github.com/anderson561/organizadordearquivospc/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-94%20passed-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-95%20passed-green.svg)]()
 [![Coverage](https://img.shields.io/badge/coverage-94%25-green.svg)]()
 
 Um sistema resiliente em Python para organização automatizada de diretórios, com interface gráfica. Classifica documentos pelo **título** — lendo o nome do arquivo, os metadados e o cabeçalho do PDF —, faz parsing de metadados de Notas Fiscais eletrônicas e, como reserva, organiza por extensão. Analisar e mover são etapas separadas: nada sai do lugar sem revisão e confirmação.
@@ -139,7 +139,7 @@ novos valem entrar no vocabulário.
 
 ## 🧪 Testes Automatizados
 
-O repositório possui **94 testes**, cobrindo simulação, tratamento de duplicidades,
+O repositório possui **95 testes**, cobrindo simulação, tratamento de duplicidades,
 resolução de conflitos, pluralização em português, extração de título e
 classificação de PDFs de verdade (gerados em tempo de teste).
 

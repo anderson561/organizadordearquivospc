@@ -103,5 +103,34 @@ class TestConflictResolutionIsIdempotent(unittest.TestCase):
         )
 
 
+class TestUmUnicoGuardaChuva(unittest.TestCase):
+    """Bug da 1.6.0 (nao publicada): o destino era montado a partir da pasta
+    do arquivo, entao uma nota em <base>/Notas ia para
+    <base>/Notas/Arquivos Organizados/... - um segundo guarda-chuva dentro da
+    subpasta, contrariando o objetivo de uma unica pasta nova na raiz."""
+
+    def setUp(self):
+        self.base = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.base, ignore_errors=True)
+
+    def test_arquivos_de_subpastas_vao_para_o_guarda_chuva_da_raiz(self):
+        for sub in ("Notas", "Impostos"):
+            os.makedirs(os.path.join(self.base, sub))
+            with open(os.path.join(self.base, sub, f"{sub}.txt"), "w", encoding="utf-8") as handle:
+                handle.write(sub)
+        with open(os.path.join(self.base, "raiz.txt"), "w", encoding="utf-8") as handle:
+            handle.write("raiz")
+
+        FileOrganizer(base_path=self.base, dry_run=False).organize()
+
+        destino = os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT")
+        self.assertEqual(sorted(os.listdir(destino)), ["Impostos.txt", "Notas.txt", "raiz.txt"])
+        for sub in ("Notas", "Impostos"):
+            self.assertFalse(
+                os.path.exists(os.path.join(self.base, sub, ORGANIZED_ROOT_NAME)),
+                f"guarda-chuva duplicado dentro de {sub}",
+            )
+
+
 if __name__ == '__main__':
     unittest.main()

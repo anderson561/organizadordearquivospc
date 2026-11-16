@@ -114,5 +114,5 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pytest advanced-organizer/tests
 ```
 
-São 94 testes. Os de `test_regressions.py` tocam o filesystem
+São 95 testes. Os de `test_regressions.py` tocam o filesystem
 real de propósito — cobrem dois bugs de perda de arquivos que mocks não reproduzem.
