@@ -10,7 +10,7 @@ Uma solução em Python desenvolvida sob princípios SOLID para a organização 
     As guias de arrecadação se separam por **jurisdição**, não pela frase genérica: municipal (`DAM` → `DAMs`), estadual (`DAE` → `DAEs`) e federal (`DARF` → `DARFs`). As três começam com "Documento de Arrecadação", então tratar essa frase como termo único mandava as três para `DARFs` — a frase federal precisa vir completa ("de Receitas Federais").
 
     O casamento é deliberadamente conservador: respeita limite de palavra, e acrônimos ambíguos exigem caixa alta e corroboração no título. Sem isso, `DAS` casaria dentro de "VENDAS" e a preposição "das" viraria guia do Simples Nacional. Os demais acrônimos casam em qualquer caixa, porque não são palavras do português — é o que permite reconhecer nomes de arquivo, sempre minúsculos (`andre darf irrf 052026.pdf`). PDF sem termo reconhecido cai na organização por extensão — melhor não classificar do que classificar errado.
-*   **Extração de Metadados de Notas Fiscais (`CompanyNameStrategy`):** Extrai a primeira data e a razão social do emitente no conteúdo do PDF e cria a estrutura `[Ano] / [MM - Mês] / [Nome da Empresa]` (ex.: `2026 / 08 - Agosto / EMPRESA LTDA`). Sem data legível usa o mês corrente; sem razão social, `Desconhecido`.
+*   **Extração de Metadados de Notas Fiscais (`CompanyNameStrategy`):** Extrai a data de emissão e a razão social do emitente no conteúdo do PDF e cria a estrutura `[Ano] / [MM - Mês] / [Nome da Empresa]` (ex.: `2026 / 08 - Agosto / EMPRESA LTDA`). Prefere a data rotulada como emissão; sem data válida usa `Sem Data`, nunca o mês corrente. Sem rótulo de razão social (com ou sem acento), `Desconhecido` — nunca a primeira linha do documento.
 *   **Resolução de Conflitos e Duplicados:**
     *   Evita sobrescrever arquivos usando sufixo de timestamp baseado na data de modificação (`mtime`), com contador incremental caso esse nome também já esteja ocupado. O destino é reconferido antes do move: se ainda estiver em uso, a movimentação é abortada em vez de sobrescrever.
     *   Caso haja um arquivo com o mesmo nome de uma pasta de destino a ser criada, o arquivo conflitante é automaticamente renomeado com a tag `_CONFLITO_F_P` (mais um contador, se necessário) para permitir a criação do diretório.
@@ -114,5 +114,5 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pytest advanced-organizer/tests
 ```
 
-São 95 testes. Os de `test_regressions.py` tocam o filesystem
+São 101 testes. Os de `test_regressions.py` tocam o filesystem
 real de propósito — cobrem dois bugs de perda de arquivos que mocks não reproduzem.

@@ -158,11 +158,30 @@ class TestFileOrganizer(unittest.TestCase):
         
         # Verify the key paths are built relative to custom_path
         expected_keys = {
-            os.path.join(organizer.base_path, "Impostos"),
             os.path.join(organizer.base_path, "Notas"),
             organizer.base_path
         }
         self.assertEqual(set(organizer.paths_and_strategies.keys()), expected_keys)
+
+    def test_base_path_e_obrigatorio(self):
+        """Sem padrao embutido: antes era a Area de Trabalho de uma maquina."""
+        with self.assertRaises(TypeError):
+            FileOrganizer(dry_run=True)
+
+    def test_ausencia_de_notas_nao_gera_aviso(self):
+        """Notas e opcional; so a pasta escolhida ausente merece aviso."""
+        organizer = FileOrganizer(base_path=r"C:\dummy_path", dry_run=True)
+
+        def so_a_raiz_existe(caminho):
+            return caminho == organizer.base_path
+
+        with patch("os.path.exists", side_effect=so_a_raiz_existe), \
+             patch("os.listdir", return_value=[]), \
+             patch("organizer.logger") as mock_logger:
+            organizer.organize()
+        avisos = [c.args[0] for c in mock_logger.warning.call_args_list]
+        self.assertFalse(any("Caminho não encontrado" in a for a in avisos), avisos)
+
 
 if __name__ == '__main__':
     unittest.main()

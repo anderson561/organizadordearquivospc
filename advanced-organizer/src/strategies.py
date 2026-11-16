@@ -1,12 +1,11 @@
 import os
 import re
 from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import NamedTuple, Optional, Tuple
 from pdfminer.high_level import extract_text
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfparser import PDFParser
-from document_terms import match_term
+from document_terms import match_term, strip_accents
 
 def sanitize_path_component(name: str) -> str:
     """Remove caracteres inválidos para nomes de pastas no Windows."""
@@ -186,15 +185,76 @@ class DocumentTitleStrategy(BaseStrategy):
         # Sem termo reconhecido: mantém o comportamento por extensão.
         return self.fallback.get_destination_subpath(file_path)
 
+
+_DATE =re.compile(r"(\d{2})/(\d{2})/(\d{4})")
+# Rotulos comparados sem acento e em caixa alta: "RAZAO SOCIAL" sem til
+# tambem e um rotulo valido, e e assim que muitos PDFs o trazem.
+_COMPANY_LABELS = ("NOME/RAZAO SOCIAL", "RAZAO SOCIAL", "EMITENTE")
+
+
+def _valid_date(match) -> Optional[Tuple[int, int]]:
+    """(ano, mes) de um casamento dd/mm/aaaa, ou None se a data nao existe."""
+    day, month, year = map(int, match.groups())
+    if 1 <= day <= 31 and 1 <= month <= 12:
+        return year, month
+    return None
+
+
+def _has_label(line: str) -> bool:
+    upper = strip_accents(line).upper()
+    return any(label in upper for label in _COMPANY_LABELS)
+
+
 class CompanyNameStrategy(BaseStrategy):
-    """Extrai Ano / Mês / Empresa de Notas Fiscais."""
-    
+    """Extrai Ano / Mes / Empresa de Notas Fiscais.
+
+    Segue a regra do projeto: sem informacao confiavel, nao inventa. Sem data
+    valida vai para "Sem Data", e nao para o mes corrente; sem rotulo de razao
+    social vai para "Desconhecido", e nao para a primeira linha do documento -
+    que costuma ser "NOTA FISCAL" ou o nome da prefeitura.
+    """
+
     MONTHS = {
-        1: "01 - Janeiro", 2: "02 - Fevereiro", 3: "03 - Março", 
+        1: "01 - Janeiro", 2: "02 - Fevereiro", 3: "03 - Março",
         4: "04 - Abril", 5: "05 - Maio", 6: "06 - Junho",
-        7: "07 - Julho", 8: "08 - Agosto", 9: "09 - Setembro", 
+        7: "07 - Julho", 8: "08 - Agosto", 9: "09 - Setembro",
         10: "10 - Outubro", 11: "11 - Novembro", 12: "12 - Dezembro"
     }
+    NO_DATE = "Sem Data"
+    NO_COMPANY = "Desconhecido"
+
+    @staticmethod
+    def _find_date(lines) -> Optional[Tuple[int, int]]:
+        """Prefere a data rotulada como emissao; senao, a primeira data valida."""
+        for i, line in enumerate(lines):
+            if "EMISS" in strip_accents(line).upper():
+                for candidate in lines[i:i + 2]:
+                    for match in _DATE.finditer(candidate):
+                        found = _valid_date(match)
+                        if found:
+                            return found
+        for line in lines:
+            for match in _DATE.finditer(line):
+                found = _valid_date(match)
+                if found:
+                    return found
+        return None
+
+    @staticmethod
+    def _find_company(lines) -> Optional[str]:
+        for i, line in enumerate(lines):
+            if not _has_label(line):
+                continue
+            if ":" in line:
+                potential = line.split(":")[-1].strip()
+                if len(potential) > 3:
+                    return potential
+            # Sem valor na mesma linha: usa a seguinte, desde que ela nao seja
+            # outro rotulo ("EMITENTE" seguido de "Razao Social: X" deve
+            # devolver X, e nao a linha do rotulo).
+            if i + 1 < len(lines) and not _has_label(lines[i + 1]):
+                return lines[i + 1].strip()
+        return None
 
     def get_destination_subpath(self, file_path: str) -> Optional[str]:
         if not file_path.lower().endswith('.pdf'):
@@ -202,42 +262,19 @@ class CompanyNameStrategy(BaseStrategy):
 
         try:
             text = extract_text(file_path)
-            
-            # Tenta encontrar data (ex: 11/03/2026)
-            date_match = re.search(r'(\d{2})/(\d{2})/(\d{4})', text)
-            if date_match:
-                day, month, year = map(int, date_match.groups())
-            else:
-                year, month = datetime.now().year, datetime.now().month
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
 
-            # Lógica para Razão Social
-            company = "Desconhecido"
-            lines = [ln.strip() for ln in text.split('\n') if ln.strip()]
-            for i, line in enumerate(lines):
-                upper_line = line.upper()
-                if "RAZÃO SOCIAL" in upper_line or "EMITENTE" in upper_line or "NOME/RAZÃO SOCIAL" in upper_line:
-                    # Tenta pegar após o sinal de dois pontos na mesma linha
-                    if ":" in line:
-                        potential = line.split(':')[-1].strip()
-                        if len(potential) > 3:
-                            company = potential
-                            break
-                    # Se não achou na linha, tenta a próxima
-                    if i + 1 < len(lines):
-                        company = lines[i+1].strip()
-                        break
-            
-            if company == "Desconhecido" and len(lines) > 0:
-                company = lines[0].strip()
+            company = sanitize_path_component(self._find_company(lines) or self.NO_COMPANY)
+            date = self._find_date(lines)
+            if date is None:
+                return os.path.join(self.NO_DATE, company)
 
-            month_str = self.MONTHS.get(month, f"{month:02d}")
-            
-            # Sanitiza cada componente do caminho
-            safe_year = sanitize_path_component(str(year))
-            safe_month = sanitize_path_component(month_str)
-            safe_company = sanitize_path_component(company)
-            
-            return os.path.join(safe_year, safe_month, safe_company)
-            
+            year, month = date
+            return os.path.join(
+                sanitize_path_component(str(year)),
+                sanitize_path_component(self.MONTHS[month]),
+                company,
+            )
+
         except Exception:
             return "Notas - Erro na Leitura"

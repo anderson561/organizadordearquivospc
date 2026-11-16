@@ -10,6 +10,34 @@ primeira publicada como release, com executável anexado.
 
 ---
 
+## [1.7.0] - 2026-11-16
+
+### Corrigido
+
+- **Nome da empresa nas notas fiscais (`<base>/Notas`).** Sem rótulo de razão
+  social, a pasta recebia a primeira linha do PDF — na prática "NOTA FISCAL" ou
+  o nome da prefeitura. Agora vai para `Desconhecido`, como a documentação já
+  dizia. O rótulo é reconhecido com ou sem acento (`RAZAO SOCIAL`), e um rótulo
+  de seção seguido de rótulo de campo (`EMITENTE` / `Razão Social: X`) devolve
+  `X`, não a linha do rótulo.
+- **Data das notas fiscais.** Usava a primeira data do texto, que podia ser um
+  vencimento ou um número de protocolo. Agora prefere a data rotulada como
+  emissão e ignora datas impossíveis (mês 13).
+
+### Alterado
+
+- **Nota sem data válida vai para `Sem Data`**, e não mais para o mês corrente:
+  um mês inventado arquivaria a nota no lugar errado sem aviso.
+- **`FileOrganizer` exige `base_path`.** O padrão embutido era a Área de
+  Trabalho de uma máquina específica — um caminho pessoal num repositório
+  público, sem sentido em qualquer outro computador. A interface e a linha de
+  comando já informavam a pasta; nada muda para quem usa o `.exe`.
+- **A subpasta `<base>/Impostos` deixou de ser varrida.** Usava a mesma
+  estratégia que a própria raiz e só gerava o aviso "Caminho não encontrado" a
+  cada execução. A ausência de `<base>/Notas`, que é opcional, também não gera
+  mais aviso.
+- Linha de comando encerra com `sys.exit` em vez do `exit` interativo.
+
 ## [1.6.0] - 2026-11-16
 
 ### Adicionado
@@ -106,5 +134,6 @@ desta versão nasce dentro do guarda-chuva.
 - Lançamento inicial: organização por tipo, seleção de pasta pela interface e
   modo simulação/real.
 
+[1.7.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.7.0
 [1.6.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.6.0
 [1.5.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.5.0

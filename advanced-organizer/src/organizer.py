@@ -35,11 +35,15 @@ class Summary(NamedTuple):
     falhas: int
 
 class FileOrganizer:
-    def __init__(self, base_path: str = r"C:\Users\ANDERSON\Desktop", dry_run: bool = True):
+    def __init__(self, base_path: str, dry_run: bool = True):
+        # base_path e obrigatorio: um padrao embutido apontava para a Area de
+        # Trabalho de uma maquina especifica - caminho pessoal num repositorio
+        # publico, e uma pasta que nao existe em nenhum outro computador.
         self.dry_run = dry_run
         self.base_path = os.path.abspath(base_path)
+        # <base>/Impostos saiu: usava a mesma estrategia que a propria raiz e
+        # so gerava um aviso de "caminho nao encontrado" a cada execucao.
         self.paths_and_strategies: Dict[str, BaseStrategy] = {
-            os.path.join(self.base_path, "Impostos"): DocumentTitleStrategy(),
             os.path.join(self.base_path, "Notas"): CompanyNameStrategy(),
             self.base_path: DocumentTitleStrategy(),
         }
@@ -189,9 +193,9 @@ class FileOrganizer:
 
             if plan.folder:
                 # Destino ancorado na pasta ESCOLHIDA, nao na pasta do arquivo:
-                # arquivos de <base>/Notas e <base>/Impostos tambem vao para o
-                # unico <base>/Arquivos Organizados, em vez de criar um segundo
-                # guarda-chuva dentro de cada subpasta.
+                # arquivos de <base>/Notas tambem vao para o unico
+                # <base>/Arquivos Organizados, em vez de criar um segundo
+                # guarda-chuva dentro da subpasta.
                 dest_path = os.path.join(self.base_path, ORGANIZED_ROOT_NAME, plan.folder, plan.name)
 
                 # Evita mover para dentro de si mesmo se já estiver na pasta certa
@@ -237,7 +241,9 @@ class FileOrganizer:
 
         for root_path in self.paths_and_strategies:
             if not os.path.exists(root_path):
-                logger.warning(f"Caminho não encontrado: {root_path}")
+                # Notas e opcional: a ausencia dela nao e problema.
+                if root_path == self.base_path:
+                    logger.warning(f"Caminho não encontrado: {root_path}")
             else:
                 logger.info(f"Processando diretório: {root_path}")
 
@@ -268,6 +274,7 @@ class FileOrganizer:
 
 if __name__ == "__main__":
     import argparse
+    import sys
     import tkinter as tk
     from tkinter import filedialog
 
@@ -285,7 +292,7 @@ if __name__ == "__main__":
         selected_path = filedialog.askdirectory(title="Selecione a pasta a ser organizada")
         if not selected_path:
             logger.error("Nenhum caminho selecionado. Encerrando.")
-            exit(1)
+            sys.exit(1)
         args.path = selected_path
 
     organizer = FileOrganizer(base_path=args.path, dry_run=not args.real)

@@ -6,7 +6,7 @@
 |---|---|
 | Produto | Organizador Avançado de Arquivos |
 | Repositório | `github.com/anderson561/organizadordearquivospc` (público) |
-| Versão descrita | 1.6.0 (release publicado) |
+| Versão descrita | 1.7.0 (último release publicado: v1.6.0) |
 | Plataforma | Windows 10/11, Python 3.13+ |
 | Data | 2026-11-16 |
 
@@ -56,10 +56,10 @@ Consequências técnicas:
 | RF-03 | Guias de arrecadação separadas por **jurisdição**: `DAMs` (municipal), `DAEs` (estadual), `DARFs` (federal). A frase genérica "documento de arrecadação" não decide sozinha. | `document_terms.TERMS` | `TestGuiasPorJurisdicao` |
 | RF-04 | Guia do Simples gerada pelo PGDASD (`PGDASD-DAS-…`) vai para `DASs`; declaração, extrato e recibo do mesmo programa vão para as próprias pastas. | `Term("PGDASD DAS")` | `TestGuiaDoSimplesPeloPGDASD` |
 | RF-05 | Arquivo não-PDF, ou PDF sem termo reconhecido, vai para a pasta da extensão em maiúsculas (`JPG`, `PDF`); sem extensão, `Outros`. | `TypeStrategy` | `test_strategies.py` |
-| RF-06 | Notas fiscais colocadas em `<base>/Notas` são organizadas em `[Ano]/[MM - Mês]/[Razão Social]`. | `CompanyNameStrategy` | `test_strategies.py` |
+| RF-06 | Notas fiscais colocadas em `<base>/Notas` são organizadas em `[Ano]/[MM - Mês]/[Razão Social]`, com a data de emissão e a razão social rotulada. Sem data válida: `Sem Data`; sem rótulo: `Desconhecido`. Nunca um valor inventado. | `CompanyNameStrategy` | `TestCompanyNameConservadora` |
 | RF-07 | **Analisar não move nada.** A análise devolve, por arquivo, o título detectado, a pasta de destino e se algum termo foi reconhecido. | `FileOrganizer.classify_all` | `test_classify_all_nao_move_nada` |
 | RF-08 | Mover só depois da análise, com confirmação que declara a quantidade de arquivos e o caminho real de destino. | `gui.OrganizerApp._start_move` | `TestJanela` |
-| RF-09 | Todas as categorias são criadas dentro de uma única pasta, **`Arquivos Organizados`**, na raiz da pasta escolhida — também para arquivos lidos das subpastas `Notas` e `Impostos`. | `ORGANIZED_ROOT_NAME`, `apply_plans` | testes de integração em `test_document_title.py`, `test_gui.py`, `test_regressions.py` (`TestUmUnicoGuardaChuva`) |
+| RF-09 | Todas as categorias são criadas dentro de uma única pasta, **`Arquivos Organizados`**, na raiz da pasta escolhida — também para arquivos lidos da subpasta `Notas`. | `ORGANIZED_ROOT_NAME`, `apply_plans` | testes de integração em `test_document_title.py`, `test_gui.py`, `test_regressions.py` (`TestUmUnicoGuardaChuva`) |
 | RF-10 | Uma segunda execução não reprocessa o que já foi organizado. | varredura não recursiva em `_iter_files` | validado manualmente (60 PDFs reais, duas execuções) |
 | RF-11 | Análise com progresso e cancelamento; cancelar interrompe no arquivo seguinte. | `progress`/`cancel` em `classify_all` e `apply_plans` | `test_cancelamento_no_meio_interrompe` |
 | RF-12 | Linha de comando: `--report` (classificação sem mover), simulação por padrão, `--real` para mover, `--version`. | `organizer.py` (`__main__`) | smoke test em `verify_project.py` |
@@ -103,10 +103,10 @@ version.py ◄── gui, organizer, gerar_version_info, verify_project
 
 ### 6.2 Fluxo de dados
 
-1. `_iter_files` lista os arquivos **diretamente** dentro de `<base>`, `<base>/Impostos` e `<base>/Notas`.
+1. `_iter_files` lista os arquivos **diretamente** dentro de `<base>` e `<base>/Notas`.
 2. Para cada arquivo, a estratégia da pasta produz um `FilePlan(name, path, title, folder, recognized)`. Nada é tocado no disco.
 3. A interface (ou o `--report`) mostra os planos.
-4. `apply_plans` monta o destino `<base>/Arquivos Organizados/<folder>/<name>` — sempre a partir da pasta escolhida, inclusive para arquivos lidos de `Notas` e `Impostos`, e chama `_move_file` para cada plano com `folder`.
+4. `apply_plans` monta o destino `<base>/Arquivos Organizados/<folder>/<name>` — sempre a partir da pasta escolhida, inclusive para arquivos lidos de `Notas`, e chama `_move_file` para cada plano com `folder`.
 5. Ao final, um `Summary(analisados, movidos, falhas)`.
 
 ### 6.3 Decisões de projeto
@@ -123,7 +123,7 @@ version.py ◄── gui, organizer, gerar_version_info, verify_project
 
 | Item | Estado atual |
 |---|---|
-| Testes automatizados | 95 (pytest), com PDFs gerados em tempo de teste (`tests/pdf_fixtures.py`), não mocks de extração |
+| Testes automatizados | 101 (pytest), com PDFs gerados em tempo de teste (`tests/pdf_fixtures.py`), não mocks de extração |
 | Cobertura | 94% |
 | Lint | `ruff`, sem pendências |
 | Verificação completa | `verify_project.py`: testes + cobertura + lint + smoke test da CLI em pasta descartável + build; grava `reports/verification_report.md` com a versão empacotada |
@@ -141,9 +141,6 @@ version.py ◄── gui, organizer, gerar_version_info, verify_project
 | D1 | `.exe` sem assinatura digital | SmartScreen alerta na primeira execução | Documentado no README e nas notas do release; assinatura exige certificado pago. |
 | D2 | Varredura não recursiva | Arquivos em subpastas (ex.: `Downloads/PDF`, ~545 arquivos) não são vistos | Decidir entre trazê-los para a raiz ou tornar a varredura recursiva excluindo `Arquivos Organizados`. |
 | D3 | Sem migração de pastas de versões anteriores | Categorias criadas direto na raiz antes da 1.6.0 continuam lá | Consolidação manual ou script pontual. |
-| D4 | `base_path` padrão é um caminho pessoal fixo (`C:\Users\ANDERSON\Desktop`) | Caminho pessoal num repositório público; padrão sem sentido em outra máquina | Usar a pasta do usuário atual (`Path.home()`) ou exigir o caminho. |
-| D5 | `<base>/Impostos` usa a mesma estratégia que `<base>` | Redundância herdada de versões antigas | Avaliar remoção ou finalidade própria. |
-| D6 | `CompanyNameStrategy` lê o texto inteiro e pega a primeira data e a primeira linha plausível | Menos conservadora que a classificação por título | Restringir à região de título ou a campos rotulados. |
 | D7 | Sem OCR | PDF escaneado depende só do nome do arquivo | Fora do escopo atual. |
 
 ## 9. Ambiente e build

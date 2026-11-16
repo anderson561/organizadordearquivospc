@@ -39,22 +39,49 @@ class TestStrategies(unittest.TestCase):
         subpath = strategy.get_destination_subpath("nota.pdf")
         self.assertEqual(subpath, os.path.join("2025", "12 - Dezembro", "Minha Empresa SA"))
 
-        # Test PDF without date (defaults to current year/month)
+        # Sem data valida: "Sem Data", nunca o mes corrente (seria um mes inventado)
         mock_extract.return_value = "Nome/Razão Social: Outra Empresa\nOutras informações"
         subpath = strategy.get_destination_subpath("nota.pdf")
-        from datetime import datetime
-        current_year = str(datetime.now().year)
-        current_month_str = CompanyNameStrategy.MONTHS[datetime.now().month]
-        self.assertEqual(subpath, os.path.join(current_year, current_month_str, "Outra Empresa"))
+        self.assertEqual(subpath, os.path.join("Sem Data", "Outra Empresa"))
 
-        # Test PDF with no recognizable company (falls back to first line)
-        mock_extract.return_value = "Primeira Linha da Nota\nOutra linha\nMais dados"
+        # Sem rotulo de razao social: "Desconhecido", nunca a primeira linha
+        # (que costuma ser "NOTA FISCAL" ou o nome da prefeitura)
+        mock_extract.return_value = "NOTA FISCAL\nEmissao 05/03/2026\nEMPRESA TESTE LTDA"
         subpath = strategy.get_destination_subpath("nota.pdf")
-        self.assertEqual(subpath, os.path.join(current_year, current_month_str, "Primeira Linha da Nota"))
+        self.assertEqual(subpath, os.path.join("2026", "03 - Março", "Desconhecido"))
 
         # Test Exception handling
         mock_extract.side_effect = Exception("Erro ao ler PDF")
         self.assertEqual(strategy.get_destination_subpath("nota.pdf"), "Notas - Erro na Leitura")
+
+class TestCompanyNameConservadora(unittest.TestCase):
+    """Casos que a versao anterior resolvia inventando um valor."""
+
+    def setUp(self):
+        self.strategy = CompanyNameStrategy()
+
+    def _subpath(self, texto):
+        with patch('strategies.extract_text', return_value=texto):
+            return self.strategy.get_destination_subpath("nota.pdf")
+
+    def test_rotulo_sem_acento_e_reconhecido(self):
+        self.assertEqual(self._subpath("RAZAO SOCIAL: ALFA SERVICOS LTDA\nEmissao: 10/07/2026"),
+                         os.path.join("2026", "07 - Julho", "ALFA SERVICOS LTDA"))
+
+    def test_prefere_a_data_de_emissao(self):
+        """Vencimento antes da emissao no texto: vale a emissao."""
+        texto = "Vencimento 30/09/2026\nRazão Social: Beta LTDA\nData de Emissão\n15/08/2026"
+        self.assertEqual(self._subpath(texto), os.path.join("2026", "08 - Agosto", "Beta LTDA"))
+
+    def test_data_impossivel_e_ignorada(self):
+        texto = "Protocolo 45/13/2026\nRazão Social: Gama SA\nEmitida em 02/01/2026"
+        self.assertEqual(self._subpath(texto), os.path.join("2026", "01 - Janeiro", "Gama SA"))
+
+    def test_rotulo_de_secao_seguido_de_rotulo_de_campo(self):
+        """'EMITENTE' seguido de 'Razão Social: X' devolve X, nao a linha do rotulo."""
+        texto = "DADOS DO EMITENTE\nRazão Social: Delta ME\n01/02/2026"
+        self.assertEqual(self._subpath(texto), os.path.join("2026", "02 - Fevereiro", "Delta ME"))
+
 
 if __name__ == '__main__':
     unittest.main()

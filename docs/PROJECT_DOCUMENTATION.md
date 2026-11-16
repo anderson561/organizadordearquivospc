@@ -1,6 +1,6 @@
 # Organizador Avançado de Arquivos – Documentação Completa
 
-Versão documentada: **1.6.0**.
+Versão documentada: **1.7.0**.
 
 ---
 
@@ -102,12 +102,12 @@ sys.path.append(r"C:\python\moverarquivos\advanced-organizer\src")
 from organizer import FileOrganizer
 
 # Decidir e executar são etapas separadas.
-planos = FileOrganizer(base_path=r"C:\Users\ANDERSON\Desktop", dry_run=True).classify_all()
+planos = FileOrganizer(base_path=r"C:\pasta\a\organizar", dry_run=True).classify_all()
 for p in planos:
     print(p.name, "->", p.folder, "| titulo:", p.title)
 
 # Para mover de verdade, um organizer com dry_run=False.
-resumo = FileOrganizer(base_path=r"C:\Users\ANDERSON\Desktop", dry_run=False).apply_plans(planos)
+resumo = FileOrganizer(base_path=r"C:\pasta\a\organizar", dry_run=False).apply_plans(planos)
 print(resumo.movidos, "movidos,", resumo.falhas, "falhas")
 ```
 
@@ -154,13 +154,13 @@ moverarquivos/
 ### `FileOrganizer`
 ```python
 class FileOrganizer:
-    def __init__(self, base_path: str = r"C:\Users\ANDERSON\Desktop", dry_run: bool = True)
+    def __init__(self, base_path: str, dry_run: bool = True)
     def classify_all(self, progress=None, cancel=None) -> List[FilePlan]
     def apply_plans(self, plans, progress=None, cancel=None) -> Summary
     def organize(self, progress=None, cancel=None) -> Summary
     def report(self) -> List[FilePlan]
 ```
-- **`base_path`** – diretório raiz a ser organizado.
+- **`base_path`** – diretório raiz a ser organizado. Obrigatório: não há pasta padrão.
 - **`dry_run`** – se `True`, apenas registra as ações.
 - **`classify_all` / `apply_plans`** – decidir e executar são etapas separadas,
   para a interface mostrar a tabela de revisão sem reler os PDFs na hora de mover.
@@ -182,11 +182,15 @@ class BaseStrategy:
   **jurisdição** — `DAMs` (municipal), `DAEs` (estadual) e `DARFs` (federal) —
   porque as três começam com a frase "Documento de Arrecadação", e a federal
   precisa vir completa ("de Receitas Federais").
-- **`CompanyNameStrategy`** – para notas fiscais. Extrai a primeira data e a
-  razão social do PDF e devolve o caminho `[Ano]/[MM - Mês]/[Empresa]`, por
-  exemplo `2026/08 - Agosto/MINIMERCADO BOCA DO RIO LTDA`. Sem data legível usa
-  o mês corrente; sem razão social, `Desconhecido`. Arquivo não-PDF cai na
-  `TypeStrategy`.
+- **`CompanyNameStrategy`** – para notas fiscais. Extrai a data e a razão
+  social do PDF e devolve o caminho `[Ano]/[MM - Mês]/[Empresa]`, por exemplo
+  `2026/08 - Agosto/MINIMERCADO BOCA DO RIO LTDA`. Segue a mesma regra
+  conservadora do resto do projeto: prefere a data rotulada como emissão e
+  ignora datas impossíveis; sem data válida devolve `Sem Data/[Empresa]`,
+  nunca o mês corrente. A razão social vem só de um rótulo (`Razão Social`,
+  `Nome/Razão Social`, `Emitente`, com ou sem acento); sem rótulo,
+  `Desconhecido` — nunca a primeira linha, que costuma ser "NOTA FISCAL" ou o
+  nome da prefeitura. Arquivo não-PDF cai na `TypeStrategy`.
 - **`TypeStrategy`** – devolve a extensão em maiúsculas como nome de pasta
   (`.jpg` → `JPG`, `.xlsx` → `XLSX`). Arquivo sem extensão vai para `Outros`.
 
@@ -196,17 +200,20 @@ class BaseStrategy:
 | Pasta | Estratégia |
 |---|---|
 | `<base>` | `DocumentTitleStrategy` |
-| `<base>/Impostos` | `DocumentTitleStrategy` |
 | `<base>/Notas` | `CompanyNameStrategy` |
 
 A varredura **não é recursiva**: só os arquivos diretamente dentro dessas pastas
 são considerados.
 
+A subpasta `<base>/Impostos` deixou de ser varrida na 1.7.0: usava a mesma
+estratégia que a própria raiz e só produzia um aviso de "caminho não
+encontrado" a cada execução.
+
 ### Pasta guarda-chuva (`ORGANIZED_ROOT_NAME`)
 `apply_plans` não move o arquivo direto para `<base>/<categoria>/`; insere
 `Arquivos Organizados` entre os dois: `<base>/Arquivos Organizados/<categoria>/`.
 O destino é sempre ancorado na **pasta escolhida** (`<base>`), mesmo para
-arquivos lidos de `<base>/Notas` ou `<base>/Impostos` — existe um único
+arquivos lidos de `<base>/Notas` — existe um único
 guarda-chuva, na raiz. Isso é o que separa, na pasta escolhida, o que o
 programa criou do que já estava lá — em vez de uma dezena de pastas novas
 (`DARFs`, `Notas Fiscais`, `JPG`...) nascendo soltas ao lado de tudo que já
@@ -252,7 +259,7 @@ termo: a lista de "sem termo reconhecido" é exatamente o insumo dessa tarefa.
 
 A partir da raiz do repositório:
 ```bash
-.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 95 testes
+.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 101 testes
 .venv\Scripts\python.exe verify_project.py                    # + cobertura, lint, smoke test e build
 ```
 `verify_project.py` grava `reports/verification_report.md` com testes, cobertura,
@@ -292,4 +299,4 @@ divergem na primeira vez que alguém atualiza só uma.
 
 ---
 
-*Documentação revisada em 2026-11-16, na publicação da versão 1.6.0.*
+*Documentação revisada em 2026-11-16, na preparação da versão 1.7.0.*

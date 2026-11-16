@@ -104,8 +104,8 @@ class TestConflictResolutionIsIdempotent(unittest.TestCase):
 
 
 class TestUmUnicoGuardaChuva(unittest.TestCase):
-    """Bug da 1.6.0 (nao publicada): o destino era montado a partir da pasta
-    do arquivo, entao uma nota em <base>/Notas ia para
+    """Bug da 1.6.0 antes de publicada: o destino era montado a partir da
+    pasta do arquivo, entao uma nota em <base>/Notas ia para
     <base>/Notas/Arquivos Organizados/... - um segundo guarda-chuva dentro da
     subpasta, contrariando o objetivo de uma unica pasta nova na raiz."""
 
@@ -114,22 +114,20 @@ class TestUmUnicoGuardaChuva(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.base, ignore_errors=True)
 
     def test_arquivos_de_subpastas_vao_para_o_guarda_chuva_da_raiz(self):
-        for sub in ("Notas", "Impostos"):
-            os.makedirs(os.path.join(self.base, sub))
-            with open(os.path.join(self.base, sub, f"{sub}.txt"), "w", encoding="utf-8") as handle:
-                handle.write(sub)
+        os.makedirs(os.path.join(self.base, "Notas"))
+        with open(os.path.join(self.base, "Notas", "Notas.txt"), "w", encoding="utf-8") as handle:
+            handle.write("Notas")
         with open(os.path.join(self.base, "raiz.txt"), "w", encoding="utf-8") as handle:
             handle.write("raiz")
 
         FileOrganizer(base_path=self.base, dry_run=False).organize()
 
         destino = os.path.join(self.base, ORGANIZED_ROOT_NAME, "TXT")
-        self.assertEqual(sorted(os.listdir(destino)), ["Impostos.txt", "Notas.txt", "raiz.txt"])
-        for sub in ("Notas", "Impostos"):
-            self.assertFalse(
-                os.path.exists(os.path.join(self.base, sub, ORGANIZED_ROOT_NAME)),
-                f"guarda-chuva duplicado dentro de {sub}",
-            )
+        self.assertEqual(sorted(os.listdir(destino)), ["Notas.txt", "raiz.txt"])
+        self.assertFalse(
+            os.path.exists(os.path.join(self.base, "Notas", ORGANIZED_ROOT_NAME)),
+            "guarda-chuva duplicado dentro de Notas",
+        )
 
 
 if __name__ == '__main__':
