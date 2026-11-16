@@ -6,7 +6,7 @@
 |---|---|
 | Produto | Organizador Avançado de Arquivos |
 | Repositório | `github.com/anderson561/organizadordearquivospc` (público) |
-| Versão descrita | 1.6.0 (último release publicado: v1.5.0) |
+| Versão descrita | 1.6.0 (release publicado) |
 | Plataforma | Windows 10/11, Python 3.13+ |
 | Data | 2026-11-16 |
 
@@ -145,7 +145,6 @@ version.py ◄── gui, organizer, gerar_version_info, verify_project
 | D5 | `<base>/Impostos` usa a mesma estratégia que `<base>` | Redundância herdada de versões antigas | Avaliar remoção ou finalidade própria. |
 | D6 | `CompanyNameStrategy` lê o texto inteiro e pega a primeira data e a primeira linha plausível | Menos conservadora que a classificação por título | Restringir à região de título ou a campos rotulados. |
 | D7 | Sem OCR | PDF escaneado depende só do nome do arquivo | Fora do escopo atual. |
-| D8 | 1.6.0 existe só localmente | Commit `3fdd6ae` à frente de `origin/main`, sem tag nem release | Publicar quando aprovado. |
 
 ## 9. Ambiente e build
 

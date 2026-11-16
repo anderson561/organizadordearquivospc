@@ -10,7 +10,7 @@ primeira publicada como release, com executável anexado.
 
 ---
 
-## [1.6.0] - 2026-09-03
+## [1.6.0] - 2026-11-16
 
 ### Adicionado
 
@@ -18,7 +18,11 @@ primeira publicada como release, com executável anexado.
   (`DARFs`, `Notas Fiscais`, `JPG`...) passa a nascer dentro de uma única pasta
   nova na raiz escolhida, em vez de solta ali junto com o que já existia. Numa
   pasta como a Downloads do usuário, isso troca uma dezena de pastas novas por
-  uma só.
+  uma só. Vale também para os arquivos lidos das subpastas `Notas` e
+  `Impostos`: existe um único guarda-chuva, na raiz.
+- `docs/TRD.md`: documento de requisitos técnicos, com cada requisito ligado
+  ao código que o cumpre e ao teste que o verifica, e a lista de limitações
+  conhecidas.
 - A confirmação da interface gráfica, antes de mover, agora mostra o caminho
   real de destino (com o guarda-chuva incluído), não só a raiz escolhida.
 
