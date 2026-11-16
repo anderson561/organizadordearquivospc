@@ -492,5 +492,64 @@ class TestGuiaDoSimplesPeloPGDASD(unittest.TestCase):
         self.assertEqual(self.strategy.get_destination_subpath(p), "Relatórios")
 
 
+import ocr  # noqa: E402
+from unittest import mock  # noqa: E402
+
+
+@unittest.skipUnless(ocr.is_available(), "OCR do Windows indisponivel neste ambiente")
+class TestOcrDePdfEscaneado(unittest.TestCase):
+    """PDF escaneado nao tem camada de texto: o cabecalho so existe na imagem.
+
+    Antes do OCR, um DAM escaneado com nome generico ('scan001.pdf') caia em
+    'PDF'. Os PDFs destes testes sao so imagem - o pdfminer nao extrai nada.
+    """
+
+    def setUp(self):
+        from scan_fixtures import build_scanned_pdf
+        self.build = build_scanned_pdf
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        self.strategy = DocumentTitleStrategy()
+
+    def _scan(self, name, lines):
+        return self.build(os.path.join(self.dir, name), lines)
+
+    def test_dam_escaneado_com_nome_generico(self):
+        p = self._scan("scan001.pdf", ["DOCUMENTO DE ARRECADACAO MUNICIPAL - DAM", "Prefeitura"])
+        folder, region = self.strategy.classify(p)
+        self.assertEqual(folder, "DAMs")
+        self.assertTrue(region.ocr)
+        self.assertTrue(region.display.startswith("[OCR]"), region.display)
+
+    def test_nome_que_ja_classifica_dispensa_o_ocr(self):
+        """OCR custa tempo: so roda quando o nome do arquivo nao bastou."""
+        p = self._scan("guia darf 102026.pdf", ["Qualquer coisa"])
+        with mock.patch("strategies.ocr.ocr_first_page") as chamada:
+            folder, region = self.strategy.classify(p)
+        self.assertEqual(folder, "DARFs")
+        chamada.assert_not_called()
+        self.assertFalse(region.ocr)
+
+    def test_ocr_sem_termo_nao_inventa_categoria(self):
+        p = self._scan("scan002.pdf", ["Documento generico", "sem termo conhecido"])
+        self.assertEqual(self.strategy.get_destination_subpath(p), "PDF")
+
+    def test_ocr_desligado_mantem_o_comportamento_antigo(self):
+        p = self._scan("scan003.pdf", ["DOCUMENTO DE ARRECADACAO MUNICIPAL - DAM"])
+        self.assertEqual(DocumentTitleStrategy(use_ocr=False).get_destination_subpath(p), "PDF")
+
+
+class TestOcrIndisponivel(unittest.TestCase):
+    """Sem OCR (outra maquina, idioma ausente), nada quebra: cai na extensao."""
+
+    def test_falha_do_ocr_vira_classificacao_por_extensao(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        # PDF com cabecalho vazio: o mesmo caminho de um escaneado.
+        p = build_pdf(os.path.join(d, "scan.pdf"), [" "])
+        with mock.patch("strategies.ocr.ocr_first_page", return_value=[]):
+            self.assertEqual(DocumentTitleStrategy().get_destination_subpath(p), "PDF")
+
+
 if __name__ == '__main__':
     unittest.main()

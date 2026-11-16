@@ -1,6 +1,6 @@
 # Organizador Avançado de Arquivos – Documentação Completa
 
-Versão documentada: **1.7.0**.
+Versão documentada: **1.8.0**.
 
 ---
 
@@ -90,6 +90,7 @@ rem Sem --path: abre um seletor de pasta
 | `--path`  | Caminho da pasta a ser organizada. Se omitido, abre o seletor de pasta. | `None` |
 | `--real`  | Executa a movimentação real (caso contrário, só simulação). | `False` |
 | `--report`| Lista o título detectado e a pasta de destino de cada arquivo, sem mover nada. | `False` |
+| `--subpastas`| Inclui os arquivos das subpastas, em qualquer profundidade. | `False` |
 | `--version`| Mostra a versão e sai. | — |
 
 ### Módulo Python
@@ -123,6 +124,7 @@ moverarquivos/
 │   │   ├─ organizer.py      # Core da aplicação (classe FileOrganizer)
 │   │   ├─ strategies.py     # Estratégias (Título do documento, Empresa, Tipo)
 │   │   ├─ document_terms.py # Vocabulário de termos e regras de plural
+│   │   ├─ ocr.py            # OCR da página 1 de PDF escaneado (OCR do Windows)
 │   │   ├─ version.py        # Número de versão (fonte única do produto)
 │   │   └─ gui.py            # Interface gráfica (tkinter)
 │   ├─ tests/                # Testes (pytest) e gerador de PDF de fixture
@@ -202,8 +204,28 @@ class BaseStrategy:
 | `<base>` | `DocumentTitleStrategy` |
 | `<base>/Notas` | `CompanyNameStrategy` |
 
-A varredura **não é recursiva**: só os arquivos diretamente dentro dessas pastas
-são considerados.
+Além dessas duas, entram:
+
+- **Pastas de versões anteriores** (sempre). Subpasta da raiz sem subpastas,
+  com nome de categoria do vocabulário (`DARFs`, `Certidões`...) ou de extensão
+  em maiúsculas (`PDF`, `JPG`) com **todos** os arquivos daquela extensão. Os
+  arquivos dela são reclassificados só "para cima": reconhecido pelo
+  vocabulário, ganha a categoria nova; sem termo, mantém a pasta em que estava
+  (nunca é rebaixado para `PDF`). A pasta antiga, se ficar vazia, é removida.
+- **Demais subpastas**, em qualquer profundidade, só com "Incluir subpastas"
+  (`include_subfolders=True`, `--subpastas`). `Arquivos Organizados`, `Notas`
+  e pastas ocultas (`.`/`$`) nunca entram. Pasta do usuário esvaziada não é
+  apagada. A tabela mostra a subpasta de origem (`FilePlan.display_name`).
+
+### OCR de PDF escaneado
+Quando a página 1 não tem camada de texto e nem o nome do arquivo nem o
+`/Title` casaram, `DocumentTitleStrategy` passa a página por `ocr.py`: o
+pypdfium2 rasteriza a página a 144 dpi e o OCR nativo do Windows
+(`Windows.Media.Ocr`, pt-BR) devolve as linhas, que ocupam o lugar do
+cabeçalho. O título aparece com o prefixo `[OCR]`. Sem OCR disponível (fora do
+Windows, sem idioma, biblioteca ausente) ou com falha, a função devolve lista
+vazia e nada muda. Para conferir dentro do `.exe` empacotado:
+`OrganizadorArquivosGUI.exe --diagnostico-ocr saida.txt --pdf escaneado.pdf`.
 
 A subpasta `<base>/Impostos` deixou de ser varrida na 1.7.0: usava a mesma
 estratégia que a própria raiz e só produzia um aviso de "caminho não
@@ -222,14 +244,12 @@ existia, nasce uma única pasta nova.
 `FilePlan.folder` continua guardando só o nome da categoria (`"DARFs"`), sem o
 guarda-chuva — é ele que a tabela da interface e o `--report` mostram. O
 guarda-chuva é inserido só no momento de montar o caminho físico de destino,
-dentro de `apply_plans`. Como a raiz escaneada é lida com `os.listdir`, não
-recursivo, o conteúdo de `Arquivos Organizados` nunca é reprocessado numa
-segunda execução.
+dentro de `apply_plans`. `Arquivos Organizados` é excluída da varredura, então
+seu conteúdo nunca é reprocessado numa segunda execução.
 
-**Não migra pastas de execuções anteriores.** Categorias já criadas direto na
-raiz por uma versão anterior (por exemplo `Downloads/DARFs`) continuam onde
-estão; só o que for movido a partir desta versão passa a nascer dentro do
-guarda-chuva. Consolidar o que já existe é decisão manual do usuário.
+Categorias criadas direto na raiz por versões anteriores à 1.6.0 (por exemplo
+`Downloads/DARFs`) são migradas para dentro do guarda-chuva desde a 1.8.0 —
+ver "Onde cada estratégia é montada".
 
 ---
 
@@ -259,7 +279,7 @@ termo: a lista de "sem termo reconhecido" é exatamente o insumo dessa tarefa.
 
 A partir da raiz do repositório:
 ```bash
-.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 101 testes
+.venv\Scripts\python.exe -m pytest advanced-organizer/tests   # 122 testes
 .venv\Scripts\python.exe verify_project.py                    # + cobertura, lint, smoke test e build
 ```
 `verify_project.py` grava `reports/verification_report.md` com testes, cobertura,
@@ -299,4 +319,4 @@ divergem na primeira vez que alguém atualiza só uma.
 
 ---
 
-*Documentação revisada em 2026-11-16, na publicação da versão 1.7.0.*
+*Documentação revisada em 2026-11-16, na publicação da versão 1.8.0.*

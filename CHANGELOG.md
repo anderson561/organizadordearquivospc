@@ -10,6 +10,42 @@ primeira publicada como release, com executável anexado.
 
 ---
 
+## [1.8.0] - 2026-11-16
+
+### Adicionado
+
+- **OCR de PDFs escaneados.** PDF sem camada de texto era classificado só pelo
+  nome do arquivo. Agora, quando o cabeçalho vem vazio e o nome não basta, a
+  página 1 é lida pelo OCR nativo do Windows (`Windows.Media.Ocr`, pt-BR), que
+  já vem no sistema — nada a instalar. Roda apenas nesses casos (~0,2 s por
+  página). O título lido aparece na tabela com o prefixo `[OCR]`. Sem OCR
+  disponível, a classificação segue como antes. Nos PDFs escaneados reais
+  usados na validação, o OCR classificou 85 de 187 que o nome não resolvia.
+- **Opção "Incluir subpastas"** (linha de comando: `--subpastas`). Lê os
+  arquivos das subpastas em qualquer profundidade, mostrando a subpasta de
+  origem na tabela. Desligada por padrão; `Arquivos Organizados`, `Notas` e
+  pastas ocultas nunca entram. Pastas do usuário não são apagadas, mesmo que
+  fiquem vazias.
+
+### Corrigido
+
+- **Pastas de versões anteriores são migradas.** As categorias que versões
+  anteriores à 1.6.0 criavam soltas na raiz (`DARFs`, `PDF`, `JPG`...) agora
+  vão para dentro de `Arquivos Organizados`, e a pasta antiga, vazia, é
+  removida. A detecção é conservadora: só pastas sem subpastas, com nome de
+  categoria do vocabulário, ou com nome de extensão e **todos** os arquivos
+  daquela extensão. Uma pasta `Documentos` ou `ABR` nunca é tocada.
+  A reclassificação é só "para cima": um arquivo de `PDF/` reconhecido como
+  DARF vai para `DARFs`; um arquivo de `DARFs/` sem termo continua em `DARFs`.
+
+### Decidido
+
+- **O `.exe` continua sem assinatura digital.** Decisão aceita, não pendência:
+  o certificado é pago e o público é interno. O aviso do SmartScreen está
+  documentado no README.
+
+---
+
 ## [1.7.0] - 2026-11-16
 
 ### Corrigido
@@ -134,6 +170,7 @@ desta versão nasce dentro do guarda-chuva.
 - Lançamento inicial: organização por tipo, seleção de pasta pela interface e
   modo simulação/real.
 
+[1.8.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.8.0
 [1.7.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.7.0
 [1.6.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.6.0
 [1.5.0]: https://github.com/anderson561/organizadordearquivospc/releases/tag/v1.5.0

@@ -2,3 +2,14 @@
 # Versoes fixadas para garantir builds reproduziveis.
 pdfminer.six==20251230
 tenacity==9.1.4
+# OCR de PDFs escaneados (opcional em tempo de execucao: sem elas, o OCR so
+# fica desligado). pypdfium2 rasteriza a pagina; os pacotes winrt dao acesso
+# ao OCR nativo do Windows (Windows.Media.Ocr), sem instalar nada na maquina.
+pypdfium2==5.15.2
+winrt-runtime==3.2.1
+winrt-Windows.Foundation==3.2.1
+winrt-Windows.Foundation.Collections==3.2.1
+winrt-Windows.Globalization==3.2.1
+winrt-Windows.Graphics.Imaging==3.2.1
+winrt-Windows.Media.Ocr==3.2.1
+winrt-Windows.Storage.Streams==3.2.1

@@ -6,6 +6,7 @@ from pdfminer.high_level import extract_text
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfparser import PDFParser
 from document_terms import match_term, strip_accents
+import ocr
 
 def sanitize_path_component(name: str) -> str:
     """Remove caracteres inválidos para nomes de pastas no Windows."""
@@ -99,6 +100,7 @@ class TitleRegion(NamedTuple):
     metadata: str      # /Title, se plausível
     heading: str       # primeiras linhas da página 1
     filename: str      # nome do arquivo, normalizado
+    ocr: bool = False  # True se o cabecalho veio do OCR (PDF escaneado)
 
     @property
     def text(self) -> str:
@@ -111,7 +113,8 @@ class TitleRegion(NamedTuple):
         if self.metadata:
             return self.metadata
         if self.heading:
-            return self.heading.splitlines()[0]
+            first = self.heading.splitlines()[0]
+            return f"[OCR] {first}" if self.ocr else first
         return self.filename
 
 
@@ -156,9 +159,11 @@ class DocumentTitleStrategy(BaseStrategy):
     """
     ERROR_FOLDER = "Erro na Leitura"
 
-    def __init__(self, max_title_lines: int = 5, fallback: Optional[BaseStrategy] = None):
+    def __init__(self, max_title_lines: int = 5, fallback: Optional[BaseStrategy] = None,
+                 use_ocr: bool = True):
         self.max_title_lines = max_title_lines
         self.fallback = fallback or TypeStrategy()
+        self.use_ocr = use_ocr
 
     def classify(self, file_path: str) -> Tuple[Optional[str], TitleRegion]:
         """Devolve (pasta, região de título) - usado pelo modo relatório."""
@@ -169,6 +174,17 @@ class DocumentTitleStrategy(BaseStrategy):
             region = TitleRegion("", "", filename_hint(file_path))
 
         entry = match_term(region.text)
+        # PDF escaneado: sem camada de texto, o cabecalho vem vazio e so o nome
+        # do arquivo sobra como sinal. O OCR roda apenas nesse caso e apenas
+        # se o nome nao bastou - custa ~0,2 s por pagina, e PDFs com texto
+        # nunca pagam esse preco.
+        if (entry is None and self.use_ocr and not region.heading
+                and file_path.lower().endswith(".pdf")):
+            lines = [c for c in map(_clean_line, ocr.ocr_first_page(file_path)) if c]
+            if lines:
+                region = region._replace(heading="\n".join(lines[:self.max_title_lines]), ocr=True)
+                entry = match_term(region.text)
+
         folder = sanitize_path_component(entry.folder_name) if entry else None
         return folder, region
 

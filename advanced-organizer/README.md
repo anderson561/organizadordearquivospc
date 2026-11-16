@@ -16,6 +16,9 @@ Uma solução em Python desenvolvida sob princípios SOLID para a organização 
     *   Caso haja um arquivo com o mesmo nome de uma pasta de destino a ser criada, o arquivo conflitante é automaticamente renomeado com a tag `_CONFLITO_F_P` (mais um contador, se necessário) para permitir a criação do diretório.
 *   **Interface Gráfica:** Janela única para informar a pasta, analisar sem mover nada, revisar a tabela e confirmar a movimentação. A linha de comando continua disponível pelo interpretador, com `--report`, `--real` e seletor de pasta.
 *   **Pasta guarda-chuva (`ORGANIZED_ROOT_NAME`):** todo arquivo reconhecido vai para dentro de `Arquivos Organizados`, criada na raiz da pasta escolhida — as categorias (`DARFs`, `JPG`...) nascem dentro dela, e não soltas na raiz junto com o que já estava lá antes.
+*   **OCR de PDF escaneado (`ocr.py`):** PDF sem camada de texto, cujo nome não basta, tem a página 1 lida pelo OCR nativo do Windows (pt-BR) — nada a instalar. Sem OCR disponível, nada muda. Para conferir no `.exe`: `OrganizadorArquivosGUI.exe --diagnostico-ocr saida.txt --pdf escaneado.pdf`.
+*   **Migração de pastas antigas:** categorias criadas soltas na raiz por versões anteriores à 1.6.0 (`DARFs`, `PDF`, `JPG`...) são levadas para dentro de `Arquivos Organizados` e a pasta vazia é removida. Detecção conservadora: sem subpastas e com nome de categoria, ou nome de extensão com todos os arquivos daquela extensão. Reclassificação só "para cima".
+*   **Incluir subpastas (opcional):** checkbox na janela ou `--subpastas` na CLI. Lê em qualquer profundidade, mostra a origem na tabela e nunca apaga pasta do usuário.
 
 ---
 
@@ -24,6 +27,7 @@ Uma solução em Python desenvolvida sob princípios SOLID para a organização 
 *   **Linguagem:** Python 3.13+
 *   **Leitor de PDFs:** `pdfminer.six` (para extração precisa de textos dos arquivos PDF)
 *   **Mecanismo de Resiliência:** `tenacity` (retries automáticos com recuo exponencial para operações de I/O de arquivos)
+*   **OCR:** `pypdfium2` (rasteriza a página) e `winrt` (`Windows.Media.Ocr`, o OCR que já vem no Windows)
 *   **Compilação:** `PyInstaller` (compila o script em um executável `.exe` único)
 *   **Testes:** `pytest`
 
@@ -86,13 +90,16 @@ respondendo mesmo com centenas de documentos.
 A CLI não é empacotada: ela roda pelo interpretador, a partir desta pasta.
 ```bash
 # Simular organização no diretório Downloads
-..\.venv\Scripts\python.exe src\organizer.py --path "C:\Users\ANDERSON\Downloads"
+..\.venv\Scripts\python.exe src\organizer.py --path "%USERPROFILE%\Downloads"
 
 # Ver titulo detectado e pasta de destino de cada arquivo, sem mover nada
-..\.venv\Scripts\python.exe src\organizer.py --path "C:\Users\ANDERSON\Downloads" --report
+..\.venv\Scripts\python.exe src\organizer.py --path "%USERPROFILE%\Downloads" --report
+
+# O mesmo, incluindo as subpastas
+..\.venv\Scripts\python.exe src\organizer.py --path "%USERPROFILE%\Downloads" --report --subpastas
 
 # Executar movimentação real no Desktop
-..\.venv\Scripts\python.exe src\organizer.py --path "C:\Users\ANDERSON\Desktop" --real
+..\.venv\Scripts\python.exe src\organizer.py --path "%USERPROFILE%\Desktop" --real
 ```
 O botão **Analisar** da interface mostra a mesma informação que `--report`, em tabela.
 
@@ -114,5 +121,5 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pytest advanced-organizer/tests
 ```
 
-São 101 testes. Os de `test_regressions.py` tocam o filesystem
+São 122 testes. Os de `test_regressions.py` tocam o filesystem
 real de propósito — cobrem dois bugs de perda de arquivos que mocks não reproduzem.

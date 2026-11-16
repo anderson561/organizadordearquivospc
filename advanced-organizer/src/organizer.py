@@ -1,9 +1,12 @@
 import os
+import re
 import shutil
 import logging
 from typing import Dict, Iterable, List, NamedTuple, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential
-from strategies import BaseStrategy, DocumentTitleStrategy, CompanyNameStrategy
+from document_terms import TERMS
+from strategies import (BaseStrategy, DocumentTitleStrategy, CompanyNameStrategy,
+                        sanitize_path_component)
 from version import __version__
 
 # Configuração de Logs
@@ -26,6 +29,45 @@ class FilePlan(NamedTuple):
     title: str                  # título detectado (vazio para não-PDF)
     folder: Optional[str]       # subpasta de destino
     recognized: bool            # True se um termo do vocabulário casou
+    origin: str = ""            # subpasta de origem, relativa a pasta escolhida
+    legacy: bool = False        # veio de uma pasta criada por versao anterior
+
+    @property
+    def display_name(self) -> str:
+        """Nome com a subpasta de origem, quando houver."""
+        return os.path.join(self.origin, self.name) if self.origin else self.name
+
+
+# Pastas de categoria que as versoes anteriores a 1.6.0 criavam soltas na
+# raiz: os nomes do vocabulario, a pasta de erro de leitura e as pastas por
+# extensao (PDF, JPG...). Sao migradas para dentro de ORGANIZED_ROOT_NAME.
+_LEGACY_TERM_FOLDERS = frozenset(
+    {sanitize_path_component(t.folder_name) for t in TERMS} | {DocumentTitleStrategy.ERROR_FOLDER}
+)
+_EXTENSION_FOLDER = re.compile(r"[A-Z0-9]{1,10}")
+
+
+def _is_legacy_folder(dir_path: str) -> bool:
+    """True se a pasta tem a forma exata de uma pasta criada pelo programa.
+
+    Conservador de proposito - uma pasta do usuario nunca pode ser esvaziada
+    por engano. Exige: nenhuma subpasta, pelo menos um arquivo e
+      - nome identico a uma categoria do vocabulario ("DARFs", "Certidões"), ou
+      - nome de extensao em maiusculas ("PDF") com TODOS os arquivos daquela
+        extensao. Uma pasta "Documentos" ou "ABR" nunca casa.
+    """
+    name = os.path.basename(dir_path)
+    try:
+        entries = os.listdir(dir_path)
+    except OSError:
+        return False
+    if any(os.path.isdir(os.path.join(dir_path, e)) for e in entries) or not entries:
+        return False
+    if name in _LEGACY_TERM_FOLDERS:
+        return True
+    if not _EXTENSION_FOLDER.fullmatch(name):
+        return False
+    return all(os.path.splitext(e)[1].lower() == "." + name.lower() for e in entries)
 
 
 class Summary(NamedTuple):
@@ -35,12 +77,15 @@ class Summary(NamedTuple):
     falhas: int
 
 class FileOrganizer:
-    def __init__(self, base_path: str, dry_run: bool = True):
+    def __init__(self, base_path: str, dry_run: bool = True, include_subfolders: bool = False):
         # base_path e obrigatorio: um padrao embutido apontava para a Area de
         # Trabalho de uma maquina especifica - caminho pessoal num repositorio
         # publico, e uma pasta que nao existe em nenhum outro computador.
         self.dry_run = dry_run
         self.base_path = os.path.abspath(base_path)
+        # Subpastas do usuario so sao lidas quando pedido: em Downloads elas
+        # incluem projetos e instaladores que ninguem quer ver espalhados.
+        self.include_subfolders = include_subfolders
         # <base>/Impostos saiu: usava a mesma estrategia que a propria raiz e
         # so gerava um aviso de "caminho nao encontrado" a cada execucao.
         self.paths_and_strategies: Dict[str, BaseStrategy] = {
@@ -128,18 +173,58 @@ class FileOrganizer:
             logger.error(f"FALHA AO MOVER '{os.path.basename(abs_source)}': {str(e)}")
             raise # Relanca para o retry se necessario
 
-    def _iter_files(self):
-        """Percorre (pasta, estrategia, caminho) de cada arquivo elegivel."""
-        for root_path, strategy in self.paths_and_strategies.items():
-            if not os.path.exists(root_path):
-                continue
-            for item in sorted(os.listdir(root_path)):
-                source_path = os.path.join(root_path, item)
-                if os.path.isfile(source_path):
-                    yield root_path, strategy, source_path
+    @staticmethod
+    def _files_in(dir_path: str) -> List[str]:
+        return [os.path.join(dir_path, item) for item in sorted(os.listdir(dir_path))
+                if os.path.isfile(os.path.join(dir_path, item))]
 
-    def _plan_for(self, strategy: BaseStrategy, source_path: str) -> FilePlan:
-        """Decide o destino de um arquivo, sem mover nada."""
+    def _subfolders(self) -> List[str]:
+        """Subpastas diretas da raiz que podem conter arquivos a organizar."""
+        reserved = {ORGANIZED_ROOT_NAME} | {os.path.basename(p) for p in self.paths_and_strategies
+                                            if p != self.base_path}
+        return [os.path.join(self.base_path, name) for name in sorted(os.listdir(self.base_path))
+                if name not in reserved and not name.startswith((".", "$"))
+                and os.path.isdir(os.path.join(self.base_path, name))
+                and not os.path.islink(os.path.join(self.base_path, name))]
+
+    def _iter_files(self):
+        """Percorre (estrategia, caminho, pasta legada) de cada arquivo elegivel.
+
+        Ordem: arquivos soltos da raiz e de Notas; depois as pastas de categoria
+        de versoes anteriores (sempre migradas); por fim, se pedido, as demais
+        subpastas, em qualquer profundidade.
+        """
+        for root_path, strategy in self.paths_and_strategies.items():
+            if os.path.exists(root_path):
+                for source_path in self._files_in(root_path):
+                    yield strategy, source_path, None
+
+        if not os.path.exists(self.base_path):
+            return
+        title_strategy = self.paths_and_strategies.get(self.base_path) or DocumentTitleStrategy()
+        others = []
+        for sub in self._subfolders():
+            if _is_legacy_folder(sub):
+                for source_path in self._files_in(sub):
+                    yield title_strategy, source_path, os.path.basename(sub)
+            else:
+                others.append(sub)
+
+        if self.include_subfolders:
+            for sub in others:
+                for dir_path, dir_names, file_names in os.walk(sub):
+                    dir_names[:] = sorted(d for d in dir_names if not d.startswith((".", "$")))
+                    for file_name in sorted(file_names):
+                        yield title_strategy, os.path.join(dir_path, file_name), None
+
+    def _plan_for(self, strategy: BaseStrategy, source_path: str,
+                  legacy_folder: Optional[str] = None) -> FilePlan:
+        """Decide o destino de um arquivo, sem mover nada.
+
+        Arquivo de pasta legada so e reclassificado "para cima": se o
+        vocabulario o reconhece, ganha a categoria nova; senao, mantem a pasta
+        em que ja estava - nunca e rebaixado para a pasta por extensao.
+        """
         name = os.path.basename(source_path)
         title = ""
         recognized = True
@@ -151,11 +236,14 @@ class FileOrganizer:
             except Exception as exc:
                 folder, title = None, f"<falha na leitura: {exc}>"
             recognized = folder is not None
-            destination = folder or strategy.fallback.get_destination_subpath(source_path)
+            destination = (folder or legacy_folder
+                           or strategy.fallback.get_destination_subpath(source_path))
         else:
             destination = strategy.get_destination_subpath(source_path)
 
-        return FilePlan(name, source_path, title, destination, recognized)
+        origin = os.path.relpath(os.path.dirname(source_path), self.base_path)
+        return FilePlan(name, source_path, title, destination, recognized,
+                        "" if origin == os.curdir else origin, legacy_folder is not None)
 
     def classify_all(self, progress=None, cancel=None) -> List[FilePlan]:
         """Classifica todos os arquivos e devolve os planos, sem mover nada.
@@ -168,10 +256,10 @@ class FileOrganizer:
         total = len(files)
         plans: List[FilePlan] = []
 
-        for index, (_, strategy, source_path) in enumerate(files, start=1):
+        for index, (strategy, source_path, legacy_folder) in enumerate(files, start=1):
             if cancel and cancel():
                 break
-            plan = self._plan_for(strategy, source_path)
+            plan = self._plan_for(strategy, source_path, legacy_folder)
             plans.append(plan)
             if progress:
                 progress(index, total, plan)
@@ -210,28 +298,45 @@ class FileOrganizer:
             if progress:
                 progress(index, len(plans), plan)
 
+        if not self.dry_run:
+            self._remove_emptied_legacy_folders(plans)
         summary = Summary(len(plans), movidos, falhas)
         self._log_summary(*summary)
         return summary
+
+    @staticmethod
+    def _remove_emptied_legacy_folders(plans: List[FilePlan]):
+        """Remove as pastas legadas que a migracao deixou vazias.
+
+        So pastas legadas, e so se vazias (os.rmdir recusa pasta com conteudo):
+        uma pasta de onde algum arquivo falhou ao sair continua la.
+        """
+        for folder in sorted({os.path.dirname(p.path) for p in plans if p.legacy}):
+            try:
+                if not os.listdir(folder):
+                    os.rmdir(folder)
+                    logger.info(f"Pasta antiga vazia removida: {folder}")
+            except OSError as exc:
+                logger.warning(f"Pasta antiga mantida ({folder}): {exc}")
 
     def report(self):
         """Imprime a classificacao de cada arquivo sem mover nada (uso no CLI)."""
         plans = self.classify_all()
         unrecognized = [p for p in plans if not p.recognized]
 
-        width = max((len(p.name) for p in plans), default=8)
+        width = max((len(p.display_name) for p in plans), default=8)
         print(f"\nClassificacao de {len(plans)} arquivo(s) em {self.base_path}\n")
         print(f"Os reconhecidos vao para dentro de {ORGANIZED_ROOT_NAME!r}, na subpasta indicada em PASTA.\n")
         print(f"{'ARQUIVO'.ljust(width)}  {'TITULO DETECTADO'.ljust(40)}  PASTA")
         print(f"{'-' * width}  {'-' * 40}  {'-' * 20}")
         for plan in plans:
-            print(f"{plan.name.ljust(width)}  {plan.title[:40].ljust(40)}  {plan.folder}")
+            print(f"{plan.display_name.ljust(width)}  {plan.title[:40].ljust(40)}  {plan.folder}")
 
         if unrecognized:
             print(f"\n{len(unrecognized)} arquivo(s) sem termo reconhecido "
                   f"(caem na pasta por extensao):")
             for plan in unrecognized:
-                print(f"  - {plan.name}: {plan.title[:60]!r}")
+                print(f"  - {plan.display_name}: {plan.title[:60]!r}")
             print("\nPara classificar estes, acrescente o termo em src/document_terms.py")
 
         return plans
@@ -283,6 +388,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default=None, help="Caminho da pasta a ser organizada")
     parser.add_argument("--real", action="store_true", help="Executa a movimentação real dos arquivos (caso contrário, apenas simula)")
     parser.add_argument("--report", action="store_true", help="Apenas lista o título detectado e a pasta de destino de cada arquivo, sem mover nada")
+    parser.add_argument("--subpastas", action="store_true", help="Inclui os arquivos das subpastas, em qualquer profundidade")
     args = parser.parse_args()
 
     # If no path provided, open a folder selection dialog
@@ -295,7 +401,8 @@ if __name__ == "__main__":
             sys.exit(1)
         args.path = selected_path
 
-    organizer = FileOrganizer(base_path=args.path, dry_run=not args.real)
+    organizer = FileOrganizer(base_path=args.path, dry_run=not args.real,
+                              include_subfolders=args.subpastas)
     if args.report:
         organizer.report()
     else:

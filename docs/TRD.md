@@ -6,7 +6,7 @@
 |---|---|
 | Produto | Organizador Avançado de Arquivos |
 | Repositório | `github.com/anderson561/organizadordearquivospc` (público) |
-| Versão descrita | 1.7.0 (release publicado) |
+| Versão descrita | 1.8.0 |
 | Plataforma | Windows 10/11, Python 3.13+ |
 | Data | 2026-11-16 |
 
@@ -33,9 +33,6 @@ O sistema classifica cada arquivo pelo **título do documento** e o move para um
 
 **Fora do escopo**
 - Leitura do conteúdo para fins fiscais (valores, vencimentos, apuração).
-- OCR de PDFs escaneados — PDF sem camada de texto é classificado só pelo nome do arquivo.
-- Varredura recursiva de subpastas (ver §8, D2).
-- Migração de pastas criadas por versões anteriores (ver §8, D3).
 - Integração com sistemas contábeis.
 
 ## 3. Usuários e uso
@@ -60,10 +57,13 @@ Consequências técnicas:
 | RF-07 | **Analisar não move nada.** A análise devolve, por arquivo, o título detectado, a pasta de destino e se algum termo foi reconhecido. | `FileOrganizer.classify_all` | `test_classify_all_nao_move_nada` |
 | RF-08 | Mover só depois da análise, com confirmação que declara a quantidade de arquivos e o caminho real de destino. | `gui.OrganizerApp._start_move` | `TestJanela` |
 | RF-09 | Todas as categorias são criadas dentro de uma única pasta, **`Arquivos Organizados`**, na raiz da pasta escolhida — também para arquivos lidos da subpasta `Notas`. | `ORGANIZED_ROOT_NAME`, `apply_plans` | testes de integração em `test_document_title.py`, `test_gui.py`, `test_regressions.py` (`TestUmUnicoGuardaChuva`) |
-| RF-10 | Uma segunda execução não reprocessa o que já foi organizado. | varredura não recursiva em `_iter_files` | validado manualmente (60 PDFs reais, duas execuções) |
+| RF-10 | Uma segunda execução não reprocessa o que já foi organizado: `Arquivos Organizados` nunca é lida. | `_subfolders` exclui o guarda-chuva | `test_guarda_chuva_existente_nao_e_relido` |
 | RF-11 | Análise com progresso e cancelamento; cancelar interrompe no arquivo seguinte. | `progress`/`cancel` em `classify_all` e `apply_plans` | `test_cancelamento_no_meio_interrompe` |
 | RF-12 | Linha de comando: `--report` (classificação sem mover), simulação por padrão, `--real` para mover, `--version`. | `organizer.py` (`__main__`) | smoke test em `verify_project.py` |
 | RF-13 | Aviso antes de mover arquivos dentro de pastas de sistema (`Windows`, `Program Files`, `System32`). | `OrganizerApp._is_system_dir` | `test_detecta_pasta_de_sistema` |
+| RF-14 | **OCR de PDF escaneado**: com cabeçalho vazio e nome sem termo, a página 1 é lida pelo OCR nativo do Windows (pt-BR). Título exibido com `[OCR]`. OCR indisponível ou com falha não muda nada: o arquivo segue a regra RF-05. | `ocr.ocr_first_page`, `DocumentTitleStrategy.classify` | `TestOcrDePdfEscaneado`, `TestOcrIndisponivel`; `--diagnostico-ocr` no `.exe` |
+| RF-15 | **Migração de pastas de versões anteriores**: subpasta da raiz sem subpastas, com nome de categoria do vocabulário ou de extensão (com todos os arquivos daquela extensão), é movida para dentro de `Arquivos Organizados` e removida se ficar vazia. Reclassificação só "para cima". | `_is_legacy_folder`, `_plan_for`, `_remove_emptied_legacy_folders` | `TestDeteccaoDePastaLegada`, `TestMigracaoDeVersoesAnteriores` |
+| RF-16 | **Incluir subpastas** (opcional, desligado por padrão): lê subpastas em qualquer profundidade, exceto `Arquivos Organizados`, `Notas`, pastas legadas e ocultas; a tabela mostra a origem. Pasta do usuário nunca é apagada. | `include_subfolders`, checkbox na GUI, `--subpastas` | `TestSubpastas` |
 
 ## 5. Requisitos não funcionais
 
@@ -76,7 +76,7 @@ Consequências técnicas:
 | RNF-05 | **Interface responsiva** durante leitura de centenas de PDFs. | Leitura em thread de trabalho; widgets tocados só pela thread principal; comunicação por fila drenada com `root.after` a cada 100 ms. |
 | RNF-06 | **Não reler os PDFs** para mover. | `apply_plans` consome os planos da análise; a classificação não é refeita. |
 | RNF-07 | **Robustez a PDFs malformados.** | Ruído `(cid:N)` de fontes sem ToUnicode é limpo antes de recortar a janela de título; falha de leitura vira linha "falha na leitura" e o arquivo cai na extensão. |
-| RNF-08 | **Distribuição sem dependências.** | PyInstaller `--onefile --windowed`; só a interface é empacotada. |
+| RNF-08 | **Distribuição sem dependências.** | PyInstaller `--onefile --windowed`; só a interface é empacotada. O OCR usa o motor que já vem no Windows — nada a instalar. |
 | RNF-09 | **Versão rastreável.** | `src/version.py` é a fonte única: título da janela, `--version`, propriedades do `.exe` e cabeçalho do relatório de verificação. |
 | RNF-10 | **Builds reproduzíveis.** | Dependências fixadas em `requirements.txt` / `requirements-dev.txt`; `build.bat` prefere o interpretador da venv do projeto. |
 
@@ -88,7 +88,8 @@ Consequências técnicas:
 gui.py ──────────┐
                  ├──► organizer.FileOrganizer ──► strategies.* ──► document_terms.TERMS
 organizer.py CLI ┘         │                          │
-                           │                          └─► pdfminer.six (página 1, /Title)
+                           │                          ├─► pdfminer.six (página 1, /Title)
+                           │                          └─► ocr.py (pypdfium2 + Windows.Media.Ocr, só se escaneado)
                            └─► _move_file (tenacity, anti-sobrescrita, conflitos)
 version.py ◄── gui, organizer, gerar_version_info, verify_project
 ```
@@ -99,15 +100,17 @@ version.py ◄── gui, organizer, gerar_version_info, verify_project
 | `strategies.py` | Padrão **Strategy**: `DocumentTitleStrategy` (título → termo → pasta, com `TypeStrategy` de reserva), `CompanyNameStrategy`, `TypeStrategy`. Extração da região de título. |
 | `organizer.py` | Orquestração: mapa pasta→estratégia, `classify_all` (decide), `apply_plans` (executa), `_move_file`, relatório e CLI. |
 | `gui.py` | Janela única tkinter, máquina de estados (`inicial` → `analisando` → `analisado` → `movendo`), fila de eventos entre threads. |
+| `ocr.py` | OCR da página 1 de PDF escaneado: rasteriza com pypdfium2 e reconhece com o OCR nativo do Windows (pt-BR). Devolve `[]` em qualquer falha. |
 | `version.py` | Número de versão. |
 
 ### 6.2 Fluxo de dados
 
-1. `_iter_files` lista os arquivos **diretamente** dentro de `<base>` e `<base>/Notas`.
-2. Para cada arquivo, a estratégia da pasta produz um `FilePlan(name, path, title, folder, recognized)`. Nada é tocado no disco.
+1. `_iter_files` lista os arquivos diretamente dentro de `<base>` e `<base>/Notas`, depois os das pastas legadas (sempre) e, com "Incluir subpastas", os das demais subpastas em qualquer profundidade. `Arquivos Organizados` nunca é lida.
+2. Para cada arquivo, a estratégia da pasta produz um `FilePlan(name, path, title, folder, recognized, origin, legacy)`. Nada é tocado no disco. Em PDF sem texto, o OCR preenche o cabeçalho antes do casamento.
 3. A interface (ou o `--report`) mostra os planos.
 4. `apply_plans` monta o destino `<base>/Arquivos Organizados/<folder>/<name>` — sempre a partir da pasta escolhida, inclusive para arquivos lidos de `Notas`, e chama `_move_file` para cada plano com `folder`.
-5. Ao final, um `Summary(analisados, movidos, falhas)`.
+5. Pastas legadas que ficaram vazias são removidas (`os.rmdir`, que recusa pasta com conteúdo).
+6. Ao final, um `Summary(analisados, movidos, falhas)`.
 
 ### 6.3 Decisões de projeto
 
@@ -123,8 +126,8 @@ version.py ◄── gui, organizer, gerar_version_info, verify_project
 
 | Item | Estado atual |
 |---|---|
-| Testes automatizados | 101 (pytest), com PDFs gerados em tempo de teste (`tests/pdf_fixtures.py`), não mocks de extração |
-| Cobertura | 94% |
+| Testes automatizados | 122 (pytest), com PDFs gerados em tempo de teste (`tests/pdf_fixtures.py`), não mocks de extração |
+| Cobertura | 93% |
 | Lint | `ruff`, sem pendências |
 | Verificação completa | `verify_project.py`: testes + cobertura + lint + smoke test da CLI em pasta descartável + build; grava `reports/verification_report.md` com a versão empacotada |
 
@@ -138,19 +141,25 @@ version.py ◄── gui, organizer, gerar_version_info, verify_project
 
 | ID | Item | Impacto | Encaminhamento sugerido |
 |---|---|---|---|
-| D1 | `.exe` sem assinatura digital | SmartScreen alerta na primeira execução | Documentado no README e nas notas do release; assinatura exige certificado pago. |
-| D2 | Varredura não recursiva | Arquivos em subpastas (ex.: `Downloads/PDF`, ~545 arquivos) não são vistos | Decidir entre trazê-los para a raiz ou tornar a varredura recursiva excluindo `Arquivos Organizados`. |
-| D3 | Sem migração de pastas de versões anteriores | Categorias criadas direto na raiz antes da 1.6.0 continuam lá | Consolidação manual ou script pontual. |
-| D7 | Sem OCR | PDF escaneado depende só do nome do arquivo | Fora do escopo atual. |
+| D8 | OCR lê só a página 1, e só o que o motor do Windows reconhece | Escaneado de baixa qualidade, ou sem idioma pt-BR instalado, continua caindo em `PDF` | Aceito: falha de OCR nunca vira classificação errada. |
+
+Decisões tomadas sobre itens antes listados aqui:
+
+| ID | Item | Decisão (1.8.0) |
+|---|---|---|
+| D1 | `.exe` sem assinatura digital | **Aceito como decisão, não pendência.** Certificado de assinatura é pago e o público é interno; o aviso do SmartScreen está documentado no README. |
+| D2 | Varredura não recursiva | Resolvido: opção "Incluir subpastas" (RF-16). |
+| D3 | Sem migração de pastas de versões anteriores | Resolvido: migração automática (RF-15). Na Downloads de referência, os 545 arquivos de `PDF/` passam a ser reclassificados — 444 viram `DARFs`. |
+| D7 | Sem OCR | Resolvido: OCR nativo do Windows (RF-14). |
 
 ## 9. Ambiente e build
 
 | Item | Valor |
 |---|---|
-| Execução | `pdfminer.six 20251230`, `tenacity 9.1.4` |
+| Execução | `pdfminer.six 20251230`, `tenacity 9.1.4`; OCR: `pypdfium2 5.15.2` e pacotes `winrt-*` 3.2.1 (projeções de `Windows.Media.Ocr`) |
 | Desenvolvimento | `pytest 9.0.2`, `coverage 7.14.1`, `ruff 0.15.15`, `pyinstaller 6.19.0` |
-| Build | `advanced-organizer/build.bat` → `gerar_version_info.py` → PyInstaller `--onefile --windowed --version-file` |
-| Saída | `advanced-organizer/dist/OrganizadorArquivosGUI.exe` (~22 MB) |
+| Build | `advanced-organizer/build.bat` → `gerar_version_info.py` → PyInstaller `--onefile --windowed --version-file`, com `--collect-all pypdfium2`/`pypdfium2_raw` e `--collect-submodules winrt` para o OCR |
+| Saída | `advanced-organizer/dist/OrganizadorArquivosGUI.exe` (~28 MB) |
 | Publicação | Release no GitHub com o `.exe` anexado e o SHA-256 nas notas |
 
 ## 10. Como estender o vocabulário

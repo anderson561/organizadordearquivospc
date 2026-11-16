@@ -65,8 +65,14 @@ class OrganizerApp:
         self.analyze_btn.grid(row=0, column=0)
         self.cancel_btn = ttk.Button(actions, text="Cancelar", command=self._request_cancel)
         self.cancel_btn.grid(row=0, column=1, padx=(8, 0))
+        # Desligado por padrao: em Downloads as subpastas costumam ser projetos
+        # e instaladores do usuario, que nao devem ser espalhados.
+        self.subfolders_var = tk.BooleanVar(value=False)
+        self.subfolders_chk = ttk.Checkbutton(actions, text="Incluir subpastas",
+                                              variable=self.subfolders_var)
+        self.subfolders_chk.grid(row=0, column=2, padx=(16, 0))
         ttk.Label(actions, text="A análise não move nenhum arquivo.").grid(
-            row=0, column=2, padx=(16, 0))
+            row=0, column=3, padx=(16, 0))
 
         table = ttk.Frame(self.root, padding=(12, 0))
         table.grid(row=2, column=0, sticky="nsew")
@@ -109,6 +115,7 @@ class OrganizerApp:
         rodando = state in ("analisando", "movendo")
         self.analyze_btn.state(["disabled"] if rodando else ["!disabled"])
         self.browse_btn.state(["disabled"] if rodando else ["!disabled"])
+        self.subfolders_chk.state(["disabled"] if rodando else ["!disabled"])
         self.cancel_btn.state(["!disabled"] if rodando else ["disabled"])
         pode_mover = state == "analisado" and any(p.folder for p in self.plans)
         self.move_btn.state(["!disabled"] if pode_mover else ["disabled"])
@@ -144,7 +151,7 @@ class OrganizerApp:
         self._clear_table()
         self._set_state("analisando")
         self.summary_var.set("Lendo os documentos...")
-        self._run_in_worker(self._work_analyze, caminho)
+        self._run_in_worker(self._work_analyze, caminho, self.subfolders_var.get())
 
     def _start_move(self):
         movimentaveis = [p for p in self.plans if p.folder]
@@ -191,9 +198,10 @@ class OrganizerApp:
         """Unico canal permitido entre a thread de trabalho e a interface."""
         self.events.put(event)
 
-    def _work_analyze(self, caminho):
+    def _work_analyze(self, caminho, subpastas=False):
         try:
-            organizer = FileOrganizer(base_path=caminho, dry_run=True)
+            organizer = FileOrganizer(base_path=caminho, dry_run=True,
+                                      include_subfolders=subpastas)
             plans = organizer.classify_all(
                 progress=lambda feitos, total, plan: self._emit("progresso", feitos, total, plan),
                 cancel=self.cancel_event.is_set,
@@ -261,7 +269,7 @@ class OrganizerApp:
     def _append_row(self, plan):
         tags = () if plan.recognized else ("sem_termo",)
         self.tree.insert("", "end", tags=tags,
-                         values=(plan.name, plan.title, plan.folder or ""))
+                         values=(plan.display_name, plan.title, plan.folder or ""))
 
     @staticmethod
     def _describe(plans, cancelado: bool) -> str:
@@ -292,4 +300,17 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Organizador Avançado - interface gráfica")
     parser.add_argument("--path", type=str, default="", help="Pré-preenche a pasta")
-    main(parser.parse_args().path)
+    # Oculto: confere, dentro do .exe empacotado, se o OCR do Windows carrega.
+    # Grava o resultado num arquivo porque o .exe --windowed nao tem console.
+    parser.add_argument("--diagnostico-ocr", metavar="SAIDA", default=None,
+                        help=argparse.SUPPRESS)
+    parser.add_argument("--pdf", default=None, help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    if args.diagnostico_ocr:
+        import ocr
+        linhas = ocr.ocr_first_page(args.pdf) if args.pdf else []
+        with open(args.diagnostico_ocr, "w", encoding="utf-8") as saida:
+            saida.write(f"disponivel={ocr.is_available()}\n")
+            saida.write("\n".join(linhas))
+        raise SystemExit(0)
+    main(args.path)

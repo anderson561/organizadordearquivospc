@@ -1,9 +1,9 @@
 # 📁 Organizador Avançado de Arquivos
 
-[![Release](https://img.shields.io/badge/release-v1.7.0-blue.svg)](https://github.com/anderson561/organizadordearquivospc/releases/latest)
+[![Release](https://img.shields.io/badge/release-v1.8.0-blue.svg)](https://github.com/anderson561/organizadordearquivospc/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-101%20passed-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-122%20passed-green.svg)]()
 [![Coverage](https://img.shields.io/badge/coverage-94%25-green.svg)]()
 
 Um sistema resiliente em Python para organização automatizada de diretórios, com interface gráfica. Classifica documentos pelo **título** — lendo o nome do arquivo, os metadados e o cabeçalho do PDF —, faz parsing de metadados de Notas Fiscais eletrônicas e, como reserva, organiza por extensão. Analisar e mover são etapas separadas: nada sai do lugar sem revisão e confirmação.
@@ -26,6 +26,7 @@ O software adota o padrão de projeto **Strategy** para desacoplar e aplicar reg
    * As guias de arrecadação se separam por **jurisdição**: `DAMs` (municipal — ISS, TFF), `DAEs` (estadual — Sefaz) e `DARFs` (federal — Receita). As três começam com a frase "Documento de Arrecadação", então tratá-la como termo único mandava as três para `DARFs`; a frase federal precisa vir completa ("de Receitas Federais").
    * A guia do Simples Nacional é reconhecida pelo prefixo do programa emissor (`PGDASD-DAS-…`), porque em parte dos PDFs o bloco do CNPJ empurra o cabeçalho para fora da região de título. Os outros papéis do mesmo programa — declaração, extrato e recibo — vão para as próprias pastas.
    * O vocabulário fica em [`src/document_terms.py`](advanced-organizer/src/document_terms.py) e é extensível: acrescente um termo e a pasta é derivada automaticamente pelas regras de plural do português.
+   * **PDF escaneado** (sem camada de texto): se o nome do arquivo não basta, a página 1 é lida pelo **OCR nativo do Windows** (pt-BR), que já vem no sistema — nada a instalar. O título lido aparece com o prefixo `[OCR]`.
    * PDF sem termo reconhecido cai na organização por extensão — o programa prefere não classificar a classificar errado.
 
 3. **Arquivos Gerais (`TypeStrategy`):**
@@ -50,6 +51,7 @@ O projeto foi construído seguindo os melhores padrões de engenharia de softwar
 * **Python 3.13+**
 * **pdfminer.six** - Leitura e extração robusta de PDFs.
 * **tenacity** - Políticas de retries automáticos.
+* **pypdfium2** + **winrt** (`Windows.Media.Ocr`) - OCR de PDFs escaneados com o motor que já vem no Windows.
 * **pytest** - Framework de testes unitários.
 * **PyInstaller** - Empacota a interface gráfica num `.exe` único e independente. A linha de comando não é empacotada: roda pelo interpretador.
 
@@ -118,6 +120,18 @@ Todo arquivo reconhecido vai para dentro de uma única pasta guarda-chuva,
 (`DARFs`, `Notas Fiscais`, `JPG`...) nascem dentro dela, não soltas na raiz junto
 com o que já estava lá.
 
+**Pastas de versões anteriores.** As categorias que versões anteriores à 1.6.0
+criavam soltas na raiz (`DARFs`, `PDF`, `JPG`...) entram na análise e são levadas
+para dentro de `Arquivos Organizados`; a pasta antiga, vazia, é removida. Só
+pastas com a forma exata de uma pasta do programa: sem subpastas, com nome de
+categoria, ou com nome de extensão e todos os arquivos daquela extensão. Um PDF
+de `PDF/` que hoje é reconhecido como DARF vai para `DARFs`; nada é rebaixado.
+
+**Incluir subpastas.** Por padrão só os arquivos soltos na pasta escolhida são
+lidos. Marcando **Incluir subpastas** (ou `--subpastas` na linha de comando), as
+subpastas entram também, em qualquer profundidade, e a tabela mostra de onde cada
+arquivo veio. As pastas do usuário não são apagadas, mesmo que fiquem vazias.
+
 ### Linha de Comando (pelo interpretador)
 ```bash
 # Relatório: mostra a classificação de cada arquivo sem mover nada
@@ -128,6 +142,9 @@ com o que já estava lá.
 
 # Execução real
 .venv\Scripts\python.exe advanced-organizer/src/organizer.py --path "C:\Caminho\Da\Pasta" --real
+
+# Incluindo as subpastas, em qualquer profundidade
+.venv\Scripts\python.exe advanced-organizer/src/organizer.py --path "C:\Caminho\Da\Pasta" --report --subpastas
 ```
 O `--report` lista, para cada arquivo, o **título detectado** e a **pasta de destino**,
 e agrupa ao final os PDFs sem termo reconhecido — a mesma informação que o botão
@@ -139,9 +156,10 @@ novos valem entrar no vocabulário.
 
 ## 🧪 Testes Automatizados
 
-O repositório possui **101 testes**, cobrindo simulação, tratamento de duplicidades,
-resolução de conflitos, pluralização em português, extração de título e
-classificação de PDFs de verdade (gerados em tempo de teste).
+O repositório possui **122 testes**, cobrindo simulação, tratamento de duplicidades,
+resolução de conflitos, pluralização em português, extração de título,
+classificação de PDFs de verdade (gerados em tempo de teste), OCR de PDF
+escaneado gerado como imagem, migração de pastas antigas e leitura de subpastas.
 
 Os testes em `test_regressions.py` usam o filesystem real de propósito: eles travam
 dois bugs de perda de arquivos que mocks não reproduzem (sobrescrita silenciosa em
