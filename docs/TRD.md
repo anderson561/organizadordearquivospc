@@ -6,7 +6,7 @@
 |---|---|
 | Produto | Organizador Avançado de Arquivos |
 | Repositório | `github.com/anderson561/organizadordearquivospc` (público) |
-| Versão descrita | 1.7.0 (último release publicado: v1.6.0) |
+| Versão descrita | 1.7.0 (release publicado) |
 | Plataforma | Windows 10/11, Python 3.13+ |
 | Data | 2026-11-16 |
 

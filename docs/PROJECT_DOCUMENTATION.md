@@ -299,4 +299,4 @@ divergem na primeira vez que alguém atualiza só uma.
 
 ---
 
-*Documentação revisada em 2026-11-16, na preparação da versão 1.7.0.*
+*Documentação revisada em 2026-11-16, na publicação da versão 1.7.0.*

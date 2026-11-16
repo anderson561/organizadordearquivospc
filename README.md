@@ -1,6 +1,6 @@
 # 📁 Organizador Avançado de Arquivos
 
-[![Release](https://img.shields.io/badge/release-v1.6.0-blue.svg)](https://github.com/anderson561/organizadordearquivospc/releases/latest)
+[![Release](https://img.shields.io/badge/release-v1.7.0-blue.svg)](https://github.com/anderson561/organizadordearquivospc/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-101%20passed-green.svg)]()
